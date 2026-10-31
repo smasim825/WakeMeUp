@@ -18,6 +18,7 @@
 	<array>
 		<string>location</string>
 		<string>fetch</string>
+		<string>audio</string>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
