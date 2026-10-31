@@ -182,8 +182,9 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
                 subdomains: const ['a', 'b', 'c', 'd'],
+                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.wakeme.app',
                 maxZoom: 19,
               ),

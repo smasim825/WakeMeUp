@@ -22,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentTabIndex = 0;
   final GlobalKey<InteractiveTravelMapState> _mapKey = GlobalKey<InteractiveTravelMapState>();
 
   // Preset popular travel destinations
@@ -58,22 +57,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: IndexedStack(
-          index: _currentTabIndex,
-          children: [
-            _buildHomeTab(context),
-            _buildSavedPlacesTab(context),
-            _buildHistoryTab(context),
-            _buildSettingsTab(context),
-          ],
-        ),
+        child: _buildHomeTab(context),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
   // ==========================================
-  // TAB 1: MAIN HOME SCREEN
+  // MAIN HOME SCREEN (SINGLE FOCUSED DASHBOARD)
   // ==========================================
 
   Widget _buildHomeTab(BuildContext context) {
@@ -457,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
           is5kmActive: provider.state.isStage1Enabled,
           is2kmActive: provider.state.isStage2Enabled,
           is500mActive: provider.state.isStage3Enabled,
-          height: 260,
+          height: 290,
           onDestinationSelected: (newDest) {
             provider.setDestination(newDest);
           },
@@ -572,283 +562,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
             child: const Text('Live View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // TAB 2: SAVED PLACES
-  // ==========================================
-
-  Widget _buildSavedPlacesTab(BuildContext context) {
-    final storage = context.watch<StorageService>();
-    final recents = storage.getRecentDestinations();
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Saved Places',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Quick destinations stored offline on your device',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: recents.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.bookmark_border_rounded, size: 54, color: AppColors.secondarySurface),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No saved places yet',
-                          style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    itemCount: recents.length,
-                    separatorBuilder: (ctx, idx) => const SizedBox(height: 10),
-                    itemBuilder: (ctx, index) {
-                      final place = recents[index];
-                      return GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        onTap: () {
-                          context.read<JourneyProvider>().setDestination(place);
-                          setState(() {
-                            _currentTabIndex = 0; // Switch to home
-                          });
-                        },
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryAccent.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.place_rounded, color: AppColors.primaryAccent, size: 20),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    place.name,
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                                  ),
-                                  if (place.address.isNotEmpty)
-                                    Text(
-                                      place.address,
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textSecondary),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // TAB 3: HISTORY
-  // ==========================================
-
-  Widget _buildHistoryTab(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Journey History',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Your recent destination alarm journeys',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history_rounded, size: 54, color: AppColors.secondarySurface),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'No completed journeys yet',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Completed destination journeys will appear here.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // TAB 4: SETTINGS
-  // ==========================================
-
-  Widget _buildSettingsTab(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const Text(
-          'Settings',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Alarm behavior and location preferences',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 20),
-
-        // 1. Alarm test card
-        GlassCard(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.volume_up_rounded, color: AppColors.primaryAccent, size: 20),
-                  SizedBox(width: 10),
-                  Text(
-                    'Test Alarm & Vibration',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Play sample chime and vibration to test speaker output before journey.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => context.read<JourneyProvider>().refreshCurrentLocation(),
-                      child: const Text('Update GPS'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => DevSimulatorDialog.show(context),
-                      child: const Text('Simulator'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // 2. Offline Information
-        GlassCard(
-          padding: const EdgeInsets.all(18),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.offline_bolt_rounded, color: AppColors.activeTeal, size: 20),
-                  SizedBox(width: 10),
-                  Text(
-                    'Offline Reliability',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                  ),
-                ],
-              ),
-              SizedBox(height: 6),
-              Text(
-                'WakeMe distance calculation is 100% mathematical on-device (Haversine formula). No mobile data or Wi-Fi is needed while traveling.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ==========================================
-  // F. BOTTOM NAVIGATION BAR
-  // ==========================================
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.cardBackground,
-        border: Border(
-          top: BorderSide(color: AppColors.borderSubtle, width: 1.0),
-        ),
-      ),
-      child: NavigationBar(
-        selectedIndex: _currentTabIndex,
-        backgroundColor: Colors.transparent,
-        indicatorColor: AppColors.primaryAccent.withValues(alpha: 0.2),
-        elevation: 0,
-        height: 64,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentTabIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined, color: AppColors.textSecondary),
-            selectedIcon: Icon(Icons.home_rounded, color: AppColors.primaryAccent),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bookmark_border_rounded, color: AppColors.textSecondary),
-            selectedIcon: Icon(Icons.bookmark_rounded, color: AppColors.primaryAccent),
-            label: 'Saved Places',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_rounded, color: AppColors.textSecondary),
-            selectedIcon: Icon(Icons.history_rounded, color: AppColors.primaryAccent),
-            label: 'History',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
-            selectedIcon: Icon(Icons.settings_rounded, color: AppColors.primaryAccent),
-            label: 'Settings',
           ),
         ],
       ),
