@@ -184,11 +184,21 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.wakeme.app',
                 maxZoom: 19,
+                tileBuilder: (context, tileWidget, tile) {
+                  return ColorFiltered(
+                    colorFilter: const ColorFilter.matrix(<double>[
+                      // Dark navigation theme color inversion
+                      -0.82, 0, 0, 0, 240,
+                      0, -0.82, 0, 0, 240,
+                      0, 0, -0.82, 0, 240,
+                      0, 0, 0, 1, 0,
+                    ]),
+                    child: tileWidget,
+                  );
+                },
               ),
 
               // Radius Circles
@@ -367,7 +377,7 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Text(
-                '© OpenStreetMap contributors © CARTO',
+                '© OpenStreetMap contributors',
                 style: TextStyle(
                   fontSize: 9,
                   color: Colors.white70,
