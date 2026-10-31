@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Handles local notifications for approaching alerts, wake-up alarms,
@@ -16,6 +16,7 @@ class NotificationService {
   static const int stage1NotificationId = 1001;
   static const int stage2NotificationId = 1002;
   static const int journeyStatusNotificationId = 1003;
+  static const int stage3NotificationId = 1004;
 
   static const String stage1ChannelId = 'wakeme_approaching_channel';
   static const String stage2ChannelId = 'wakeme_wakeup_channel';
@@ -51,7 +52,9 @@ class NotificationService {
   }
 
   Future<bool> requestPermissions() async {
-    if (Platform.isIOS || Platform.isMacOS) {
+    if (kIsWeb) return true;
+    final platform = defaultTargetPlatform;
+    if (platform == TargetPlatform.iOS || platform == TargetPlatform.macOS) {
       final iosImplementation = _notificationsPlugin
           .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
       final granted = await iosImplementation?.requestPermissions(
@@ -60,7 +63,7 @@ class NotificationService {
         sound: true,
       );
       return granted ?? false;
-    } else if (Platform.isAndroid) {
+    } else if (platform == TargetPlatform.android) {
       final androidImplementation = _notificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       final granted = await androidImplementation?.requestNotificationsPermission();
@@ -102,7 +105,7 @@ class NotificationService {
       await _notificationsPlugin.show(
         id: stage1NotificationId,
         title: '📍 Approaching: $destinationName',
-        body: 'You are within ${distanceKm.toStringAsFixed(1)} km of your stop! Prepare your belongings.',
+        body: 'You are within ${distanceKm < 1 ? '${(distanceKm * 1000).round()} m' : '${distanceKm.toStringAsFixed(1)} km'} of your stop! Prepare your belongings.',
         notificationDetails: details,
       );
     } catch (_) {}
@@ -112,6 +115,7 @@ class NotificationService {
   Future<void> showWakeUpNotification({
     required String destinationName,
     required double distanceKm,
+    int notificationId = stage2NotificationId,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       stage2ChannelId,
@@ -130,7 +134,7 @@ class NotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      interruptionLevel: InterruptionLevel.critical,
+      interruptionLevel: InterruptionLevel.timeSensitive, // 'critical' needs an Apple entitlement
     );
 
     const details = NotificationDetails(
@@ -140,9 +144,9 @@ class NotificationService {
 
     try {
       await _notificationsPlugin.show(
-        id: stage2NotificationId,
+        id: notificationId,
         title: '🚨 WAKE UP! Arriving at $destinationName',
-        body: 'You are now within ${distanceKm.toStringAsFixed(1)} km! Your stop is next.',
+        body: 'You are now within ${distanceKm < 1 ? '${(distanceKm * 1000).round()} m' : '${distanceKm.toStringAsFixed(1)} km'}! Your stop is next.',
         notificationDetails: details,
       );
     } catch (_) {}

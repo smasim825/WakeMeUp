@@ -487,9 +487,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 } else {
                   final started = await provider.startJourney();
-                  if (started && context.mounted) {
+                  if (!context.mounted) return;
+                  if (started) {
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const ActiveJourneyScreen()),
+                    );
+                  } else {
+                    // Feedback when location permission is denied or service unavailable
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          provider.state.statusMessage ??
+                              'Could not start the journey. Please check location permissions.',
+                        ),
+                      ),
                     );
                   }
                 }

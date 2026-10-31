@@ -16,8 +16,6 @@ class LocationPermissionResult {
 
 /// Service wrapping Geolocator and location stream management.
 class LocationService {
-  StreamSubscription<Position>? _positionSubscription;
-
   /// Check and request required location permissions
   Future<LocationPermissionResult> checkAndRequestPermissions() async {
     bool serviceEnabled;
@@ -75,7 +73,12 @@ class LocationService {
       );
     } catch (e) {
       debugPrint('Error getting current position: $e');
-      return await Geolocator.getLastKnownPosition();
+      try {
+        return await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        // getLastKnownPosition is unsupported on some platforms (e.g. web)
+        return null;
+      }
     }
   }
 
@@ -113,10 +116,5 @@ class LocationService {
     }
 
     return Geolocator.getPositionStream(locationSettings: locationSettings);
-  }
-
-  void stopPositionStream() {
-    _positionSubscription?.cancel();
-    _positionSubscription = null;
   }
 }

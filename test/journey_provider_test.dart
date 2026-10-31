@@ -7,6 +7,7 @@ import 'package:wakeme/models/destination.dart';
 import 'package:wakeme/models/journey_state.dart';
 import 'package:wakeme/providers/journey_provider.dart';
 import 'package:wakeme/services/storage_service.dart';
+import 'package:wakeme/utils/distance_calculator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -284,6 +285,85 @@ void main() {
       expect(journeyProvider.state.stage2Status, equals(AlertStageStatus.startedInside));
       // Alarm must NOT be sounding immediately
       expect(journeyProvider.state.isAlarmSounding, isFalse);
+    });
+  });
+
+  group('Regression tests for audit fixes', () {
+    const dest = Destination(
+      name: 'Regression Stop',
+      address: 'Somewhere',
+      latitude: 40.7128,
+      longitude: -74.0060,
+    );
+
+    Position fix(double lat) => Position(
+          latitude: lat,
+          longitude: -74.0060,
+          timestamp: DateTime.now(),
+          accuracy: 10.0,
+          altitude: 0.0,
+          altitudeAccuracy: 1.0,
+          heading: 0.0,
+          headingAccuracy: 0.0,
+          speed: 10.0,
+          speedAccuracy: 1.0,
+        );
+
+    test('Wake-up alarm still fires at 2 km when journey started between 2 km and 5 km', () async {
+      await journeyProvider.setDestination(dest);
+
+      journeyProvider.processPositionForTesting(fix(40.7443)); // ~3.5 km away
+      expect(journeyProvider.state.stage1Status, equals(AlertStageStatus.startedInside));
+      expect(journeyProvider.state.stage2Status, equals(AlertStageStatus.waiting));
+
+      journeyProvider.processPositionForTesting(fix(40.7300)); // ~1.9 km away
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(journeyProvider.state.stage2Status, equals(AlertStageStatus.triggered));
+      expect(journeyProvider.state.isAlarmSounding, isTrue);
+    });
+
+    test('Disabled 5 km alert does not sound but 2 km wake-up still works', () async {
+      await journeyProvider.setDestination(dest);
+      journeyProvider.toggle5kmAlert(false);
+      journeyProvider.toggleSimulatorMode(true);
+
+      await journeyProvider.setSimulatedDistance(4500.0);
+      expect(journeyProvider.state.isAlarmSounding, isFalse);
+      expect(journeyProvider.state.stage1Status, equals(AlertStageStatus.startedInside));
+
+      await journeyProvider.setSimulatedDistance(1800.0);
+      expect(journeyProvider.state.stage2Status, equals(AlertStageStatus.triggered));
+      expect(journeyProvider.state.isAlarmSounding, isTrue);
+    });
+
+    test('Cancelling resets stage 3, trigger times and Step 2 schedule', () async {
+      await journeyProvider.setDestination(dest);
+      journeyProvider.toggle500mAlert(true);
+      journeyProvider.toggleSimulatorMode(true);
+      await journeyProvider.setSimulatedDistance(400.0);
+      expect(journeyProvider.state.stage3Status, equals(AlertStageStatus.triggered));
+      expect(journeyProvider.state.step2ScheduledAt, isNotNull);
+
+      await journeyProvider.cancelJourney();
+      expect(journeyProvider.state.stage3Status, equals(AlertStageStatus.waiting));
+      expect(journeyProvider.state.step2ScheduledAt, isNull);
+      expect(journeyProvider.state.stage1TriggeredAt, isNull);
+    });
+
+    test('Clearing destination also clears remaining distance', () async {
+      await journeyProvider.setDestination(dest);
+      journeyProvider.toggleSimulatorMode(true);
+      await journeyProvider.setSimulatedDistance(3000.0);
+      expect(journeyProvider.state.remainingDistanceMeters, isNotNull);
+
+      await journeyProvider.clearDestination();
+      expect(journeyProvider.state.destination, isNull);
+      expect(journeyProvider.state.remainingDistanceMeters, isNull);
+    });
+
+    test('Haversine never returns NaN for antipodal points', () {
+      final d = DistanceCalculator.distanceBetween(0, 0, 0, 180);
+      expect(d.isNaN, isFalse);
     });
   });
 

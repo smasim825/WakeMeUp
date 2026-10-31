@@ -110,6 +110,11 @@ class JourneyState {
     bool? hasLocationPermission,
     String? statusMessage,
     bool clearDestination = false,
+    bool clearRemainingDistance = false,
+    bool clearInitialDistance = false,
+    bool clearStatusMessage = false,
+    bool clearStep2Schedule = false,
+    bool clearTriggerTimes = false,
   }) {
     return JourneyState(
       isActive: isActive ?? this.isActive,
@@ -119,8 +124,10 @@ class JourneyState {
       currentAltitude: currentAltitude ?? this.currentAltitude,
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
       currentAccuracyMeters: currentAccuracyMeters ?? this.currentAccuracyMeters,
-      remainingDistanceMeters: remainingDistanceMeters ?? this.remainingDistanceMeters,
-      initialDistanceMeters: initialDistanceMeters ?? this.initialDistanceMeters,
+      remainingDistanceMeters:
+          clearRemainingDistance ? null : (remainingDistanceMeters ?? this.remainingDistanceMeters),
+      initialDistanceMeters:
+          clearInitialDistance ? null : (initialDistanceMeters ?? this.initialDistanceMeters),
       stage1DistanceKm: stage1DistanceKm ?? this.stage1DistanceKm,
       stage2DistanceKm: stage2DistanceKm ?? this.stage2DistanceKm,
       stage3DistanceKm: stage3DistanceKm ?? this.stage3DistanceKm,
@@ -130,10 +137,11 @@ class JourneyState {
       stage1Status: stage1Status ?? this.stage1Status,
       stage2Status: stage2Status ?? this.stage2Status,
       stage3Status: stage3Status ?? this.stage3Status,
-      stage1TriggeredAt: stage1TriggeredAt ?? this.stage1TriggeredAt,
-      stage2TriggeredAt: stage2TriggeredAt ?? this.stage2TriggeredAt,
-      stage3TriggeredAt: stage3TriggeredAt ?? this.stage3TriggeredAt,
-      step2ScheduledAt: step2ScheduledAt ?? this.step2ScheduledAt,
+      stage1TriggeredAt: clearTriggerTimes ? null : (stage1TriggeredAt ?? this.stage1TriggeredAt),
+      stage2TriggeredAt: clearTriggerTimes ? null : (stage2TriggeredAt ?? this.stage2TriggeredAt),
+      stage3TriggeredAt: clearTriggerTimes ? null : (stage3TriggeredAt ?? this.stage3TriggeredAt),
+      step2ScheduledAt:
+          (clearStep2Schedule || clearTriggerTimes) ? null : (step2ScheduledAt ?? this.step2ScheduledAt),
       step2DelayMinutes: step2DelayMinutes ?? this.step2DelayMinutes,
       currentAlarmStep: currentAlarmStep ?? this.currentAlarmStep,
       startedAt: startedAt ?? this.startedAt,
@@ -141,7 +149,7 @@ class JourneyState {
       isAlarmSounding: isAlarmSounding ?? this.isAlarmSounding,
       isSimulatorMode: isSimulatorMode ?? this.isSimulatorMode,
       hasLocationPermission: hasLocationPermission ?? this.hasLocationPermission,
-      statusMessage: statusMessage ?? this.statusMessage,
+      statusMessage: clearStatusMessage ? null : (statusMessage ?? this.statusMessage),
     );
   }
 
@@ -169,6 +177,13 @@ class JourneyState {
     };
   }
 
+  static AlertStageStatus _statusFromJson(dynamic raw) {
+    if (raw is int && raw >= 0 && raw < AlertStageStatus.values.length) {
+      return AlertStageStatus.values[raw];
+    }
+    return AlertStageStatus.waiting;
+  }
+
   factory JourneyState.fromJson(Map<String, dynamic> json) {
     return JourneyState(
       isActive: json['isActive'] as bool? ?? false,
@@ -182,15 +197,9 @@ class JourneyState {
       isStage1Enabled: json['isStage1Enabled'] as bool? ?? true,
       isStage2Enabled: json['isStage2Enabled'] as bool? ?? true,
       isStage3Enabled: json['isStage3Enabled'] as bool? ?? false,
-      stage1Status: json['stage1Status'] != null
-          ? AlertStageStatus.values[(json['stage1Status'] as int)]
-          : AlertStageStatus.waiting,
-      stage2Status: json['stage2Status'] != null
-          ? AlertStageStatus.values[(json['stage2Status'] as int)]
-          : AlertStageStatus.waiting,
-      stage3Status: json['stage3Status'] != null
-          ? AlertStageStatus.values[(json['stage3Status'] as int)]
-          : AlertStageStatus.waiting,
+      stage1Status: _statusFromJson(json['stage1Status']),
+      stage2Status: _statusFromJson(json['stage2Status']),
+      stage3Status: _statusFromJson(json['stage3Status']),
       stage1TriggeredAt: json['stage1TriggeredAt'] != null
           ? DateTime.tryParse(json['stage1TriggeredAt'] as String)
           : null,

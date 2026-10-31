@@ -24,7 +24,8 @@ class DistanceCalculator {
         math.cos(lat1Rad) * math.cos(lat2Rad) *
         math.sin(dLon / 2) * math.sin(dLon / 2);
 
-    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    final double aClamped = a.clamp(0.0, 1.0).toDouble();
+    final double c = 2 * math.atan2(math.sqrt(aClamped), math.sqrt(1 - aClamped));
     return earthRadiusMeters * c;
   }
 

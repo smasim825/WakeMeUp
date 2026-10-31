@@ -67,11 +67,28 @@ class JourneyProvider extends ChangeNotifier {
     // 2. Resume GPS stream if restored journey is active
     if (_state.isActive) {
       _startTrackingStream();
+      _rearmStep2Timer();
     }
 
     // 3. Fetch initial current location
     await refreshCurrentLocation();
     notifyListeners();
+  }
+
+  /// After an app restart the in-memory Step 2 timer is gone; re-create it
+  /// from the persisted schedule so the follow-up alarm still fires.
+  void _rearmStep2Timer() {
+    if (_state.stage1Status != AlertStageStatus.triggered ||
+        _state.stage2Status != AlertStageStatus.waiting ||
+        _state.step2ScheduledAt == null) {
+      return;
+    }
+    final remaining = _state.step2ScheduledAt!.difference(DateTime.now());
+    _step2Timer?.cancel();
+    _step2Timer = Timer(
+      remaining.isNegative ? Duration.zero : remaining,
+      () => _triggerStep2Alarm(),
+    );
   }
 
   /// Request permissions and get current GPS location
@@ -122,7 +139,7 @@ class JourneyProvider extends ChangeNotifier {
   Future<void> setDestination(Destination destination) async {
     _state = _state.copyWith(
       destination: destination,
-      clearDestination: false,
+      clearRemainingDistance: true,
     );
 
     await _storageService.saveDestination(destination);
@@ -148,7 +165,7 @@ class JourneyProvider extends ChangeNotifier {
     }
     _state = _state.copyWith(
       clearDestination: true,
-      remainingDistanceMeters: null,
+      clearRemainingDistance: true,
     );
     await _storageService.clearSavedDestination();
     notifyListeners();
@@ -214,15 +231,17 @@ class JourneyProvider extends ChangeNotifier {
       _updateCurrentPosition(currentPos);
     }
 
-    final double currentDistanceMeters = _state.remainingDistanceMeters ??
-        ((_state.currentLatitude != null && _state.currentLongitude != null)
+    // Always compute from the freshest GPS fix (never a stale remaining distance
+    // from a previous destination/journey).
+    final double? currentDistanceMeters =
+        (_state.currentLatitude != null && _state.currentLongitude != null)
             ? DistanceCalculator.distanceBetween(
                 _state.currentLatitude!,
                 _state.currentLongitude!,
                 _state.destination!.latitude,
                 _state.destination!.longitude,
               )
-            : 0.0);
+            : null;
 
     // Detect if journey started inside an alert radius
     final double stage1Meters = _state.stage1DistanceKm * 1000.0;
@@ -232,25 +251,42 @@ class JourneyProvider extends ChangeNotifier {
     AlertStageStatus stage2Status = AlertStageStatus.waiting;
     String? startNotice;
 
-    if (currentDistanceMeters > 0 && currentDistanceMeters <= stage2Meters) {
+    if (currentDistanceMeters != null && currentDistanceMeters <= stage2Meters) {
       stage1Status = AlertStageStatus.startedInside;
       stage2Status = AlertStageStatus.startedInside;
       startNotice =
           'You started inside the ${DistanceCalculator.formatDistance(stage2Meters)} radius. Both alerts marked as passed to avoid false alarms.';
-    } else if (currentDistanceMeters > 0 && currentDistanceMeters <= stage1Meters) {
+    } else if (currentDistanceMeters != null && currentDistanceMeters <= stage1Meters) {
       stage1Status = AlertStageStatus.startedInside;
       startNotice =
           'You started inside the ${DistanceCalculator.formatDistance(stage1Meters)} radius. Approaching alert is marked as passed.';
     }
 
+    // Stage 3 (optional "almost there") – skip it if we already start inside it
+    AlertStageStatus stage3Status = AlertStageStatus.waiting;
+    if (currentDistanceMeters != null &&
+        currentDistanceMeters <= _state.stage3DistanceKm * 1000.0) {
+      stage3Status = AlertStageStatus.startedInside;
+    }
+
+    _step2Timer?.cancel();
+    _step2Timer = null;
+
     _state = _state.copyWith(
       isActive: true,
+      isAlarmSounding: false,
+      currentAlarmStep: 0,
       initialDistanceMeters: currentDistanceMeters,
+      clearInitialDistance: currentDistanceMeters == null,
       remainingDistanceMeters: currentDistanceMeters,
+      clearRemainingDistance: currentDistanceMeters == null,
       stage1Status: stage1Status,
       stage2Status: stage2Status,
+      stage3Status: stage3Status,
+      clearTriggerTimes: true,
       startedAt: DateTime.now(),
       statusMessage: startNotice,
+      clearStatusMessage: startNotice == null,
     );
 
     // Persist active journey state to SharedPreferences
@@ -318,6 +354,9 @@ class JourneyProvider extends ChangeNotifier {
     AlertStageStatus stage1Status = _state.stage1Status;
     AlertStageStatus stage2Status = _state.stage2Status;
     String? startNotice = _state.statusMessage;
+    if (startNotice != null && startNotice.startsWith('GPS signal is weak')) {
+      startNotice = null;
+    }
 
     if (_state.initialDistanceMeters == null || _state.initialDistanceMeters == 0.0) {
       final double stage1Meters = _state.stage1DistanceKm * 1000.0;
@@ -339,10 +378,13 @@ class JourneyProvider extends ChangeNotifier {
       currentSpeedKmh: position.speed >= 0 ? (position.speed * 3.6) : 0.0,
       currentAccuracyMeters: position.accuracy,
       remainingDistanceMeters: remainingMeters,
-      initialDistanceMeters: _state.initialDistanceMeters ?? remainingMeters,
+      initialDistanceMeters: (_state.initialDistanceMeters == null || _state.initialDistanceMeters! <= 0)
+          ? remainingMeters
+          : _state.initialDistanceMeters,
       stage1Status: stage1Status,
       stage2Status: stage2Status,
       statusMessage: startNotice,
+      clearStatusMessage: startNotice == null,
       lastPositionUpdate: DateTime.now(),
     );
 
@@ -361,37 +403,49 @@ class JourneyProvider extends ChangeNotifier {
 
     // 1. Step 1: Perimeter Entry Alert
     if (_state.stage1Status == AlertStageStatus.waiting && remainingMeters <= stage1Meters) {
-      final step2Time = DateTime.now().add(Duration(minutes: _state.step2DelayMinutes));
-      _state = _state.copyWith(
-        stage1Status: AlertStageStatus.triggered,
-        stage1TriggeredAt: DateTime.now(),
-        step2ScheduledAt: step2Time,
-        currentAlarmStep: 1,
-        isAlarmSounding: true,
-        statusMessage: 'Approaching $destName! Step 1 Alert sounded. Step 2 follow-up in ${_state.step2DelayMinutes} mins.',
-      );
+      if (!_state.isStage1Enabled) {
+        // Alert turned off: mark as passed silently so Step 2 can still run.
+        _state = _state.copyWith(stage1Status: AlertStageStatus.startedInside);
+      } else {
+        final bool scheduleStep2 = _state.isStage2Enabled;
+        final step2Time = DateTime.now().add(Duration(minutes: _state.step2DelayMinutes));
+        _state = _state.copyWith(
+          stage1Status: AlertStageStatus.triggered,
+          stage1TriggeredAt: DateTime.now(),
+          step2ScheduledAt: scheduleStep2 ? step2Time : null,
+          currentAlarmStep: 1,
+          isAlarmSounding: true,
+          statusMessage: scheduleStep2
+              ? 'Approaching $destName! Step 1 Alert sounded. Step 2 follow-up in ${_state.step2DelayMinutes} mins.'
+              : 'Approaching $destName! Step 1 Alert sounded.',
+        );
 
-      // Trigger notification, sound, vibration
-      await _notificationService.showApproachingNotification(
-        destinationName: destName,
-        distanceKm: _state.stage1DistanceKm,
-      );
-      await _alarmService.triggerApproachingAlert();
-      await _storageService.saveActiveJourney(_state);
+        if (scheduleStep2) {
+          // Start Step 2 follow-up timer before awaiting anything so a fast
+          // second GPS fix cannot race it.
+          _step2Timer?.cancel();
+          _step2Timer = Timer(Duration(minutes: _state.step2DelayMinutes), () {
+            _triggerStep2Alarm();
+          });
+        }
 
-      // Start Step 2 follow-up timer (2 minutes later)
-      _step2Timer?.cancel();
-      _step2Timer = Timer(Duration(minutes: _state.step2DelayMinutes), () {
-        _triggerStep2Alarm();
-      });
+        await _notificationService.showApproachingNotification(
+          destinationName: destName,
+          distanceKm: _state.stage1DistanceKm,
+        );
+        await _alarmService.triggerApproachingAlert();
+        await _storageService.saveActiveJourney(_state);
+      }
     }
 
-    // 2. Step 2: Wake Up Follow-up Alert (triggers either 2 mins later OR when entering close boundary)
+    // 2. Step 2: Wake Up Follow-up Alert (triggers either N mins later OR when entering close boundary).
+    // Stage 1 may be "triggered" OR "startedInside" (user began between the two radii) –
+    // in the latter case only the close boundary applies (no schedule exists).
     final bool isScheduledTimeReached = _state.step2ScheduledAt != null &&
         DateTime.now().isAfter(_state.step2ScheduledAt!);
     final bool isCloseBoundaryReached = remainingMeters <= stage2Meters;
 
-    if (_state.stage1Status == AlertStageStatus.triggered &&
+    if (_state.stage1Status != AlertStageStatus.waiting &&
         _state.stage2Status == AlertStageStatus.waiting &&
         (isScheduledTimeReached || isCloseBoundaryReached)) {
       await _triggerStep2Alarm();
@@ -410,6 +464,7 @@ class JourneyProvider extends ChangeNotifier {
       await _notificationService.showWakeUpNotification(
         destinationName: destName,
         distanceKm: _state.stage3DistanceKm,
+        notificationId: NotificationService.stage3NotificationId,
       );
       await _alarmService.triggerWakeUpAlarm();
       await _storageService.saveActiveJourney(_state);
@@ -424,6 +479,14 @@ class JourneyProvider extends ChangeNotifier {
     if (_state.stage2Status != AlertStageStatus.waiting) return;
     _step2Timer?.cancel();
     _step2Timer = null;
+
+    if (!_state.isStage2Enabled) {
+      // Wake-up alarm disabled by the user: mark as passed without sounding.
+      _state = _state.copyWith(stage2Status: AlertStageStatus.startedInside);
+      await _storageService.saveActiveJourney(_state);
+      notifyListeners();
+      return;
+    }
 
     final destName = _state.destination?.name ?? 'Destination';
     _state = _state.copyWith(
@@ -484,7 +547,9 @@ class JourneyProvider extends ChangeNotifier {
       currentAlarmStep: 0,
       stage1Status: AlertStageStatus.waiting,
       stage2Status: AlertStageStatus.waiting,
-      step2ScheduledAt: null,
+      stage3Status: AlertStageStatus.waiting,
+      clearTriggerTimes: true,
+      clearInitialDistance: true,
       statusMessage: 'Journey cancelled.',
     );
 
@@ -530,9 +595,14 @@ class JourneyProvider extends ChangeNotifier {
   /// Reset alert triggers in simulator mode for quick repeated testing
   void resetAlertTriggersForTesting() {
     _alarmService.stopAlarm();
+    _step2Timer?.cancel();
+    _step2Timer = null;
     _state = _state.copyWith(
       stage1Status: AlertStageStatus.waiting,
       stage2Status: AlertStageStatus.waiting,
+      stage3Status: AlertStageStatus.waiting,
+      clearTriggerTimes: true,
+      currentAlarmStep: 0,
       isAlarmSounding: false,
       statusMessage: '[Simulator] Alert stages reset for testing.',
     );
