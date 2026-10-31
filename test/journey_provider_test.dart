@@ -67,6 +67,38 @@ void main() {
       expect(storageService.getStage2Distance(), equals(3.0));
     });
 
+    test('Segmented select bar (5km, 2km, 1km, 500m) updates radius cleanly', () async {
+      await journeyProvider.setAlertRadius(0.5); // 500 meters
+      expect(journeyProvider.state.stage1DistanceKm, equals(0.5));
+      expect(storageService.getStage1Distance(), equals(0.5));
+
+      await journeyProvider.setAlertRadius(2.0); // 2 km
+      expect(journeyProvider.state.stage1DistanceKm, equals(2.0));
+    });
+
+    test('2-Step Alarm: Step 1 schedules Step 2 and follow-up triggers reliably', () async {
+      await journeyProvider.setDestination(testDestination);
+      journeyProvider.toggleSimulatorMode(true);
+
+      // Approach 4.5 km -> triggers Step 1
+      await journeyProvider.setSimulatedDistance(4500.0);
+      expect(journeyProvider.state.stage1Status, equals(AlertStageStatus.triggered));
+      expect(journeyProvider.state.currentAlarmStep, equals(1));
+      expect(journeyProvider.state.step2ScheduledAt, isNotNull);
+      expect(journeyProvider.state.isAlarmSounding, isTrue);
+
+      // User dismisses Step 1
+      await journeyProvider.dismissAlarm();
+      expect(journeyProvider.state.isAlarmSounding, isFalse);
+      expect(journeyProvider.state.stage2Status, equals(AlertStageStatus.waiting));
+
+      // 2 minutes later: Step 2 triggers follow-up alarm
+      await journeyProvider.triggerStep2NowForTesting();
+      expect(journeyProvider.state.stage2Status, equals(AlertStageStatus.triggered));
+      expect(journeyProvider.state.currentAlarmStep, equals(2));
+      expect(journeyProvider.state.isAlarmSounding, isTrue);
+    });
+
     test('Simulator mode correctly transitions through Stage 1 and Stage 2 without duplicates', () async {
       await journeyProvider.setDestination(testDestination);
       journeyProvider.toggleSimulatorMode(true);

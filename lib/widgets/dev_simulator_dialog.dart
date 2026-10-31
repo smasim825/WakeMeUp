@@ -213,7 +213,12 @@ class DevSimulatorDialog extends StatelessWidget {
                       onTap: () => provider.setSimulatedDistance(1800.0),
                     ),
                     _buildScenarioChip(
-                      label: '4. Arrived (200 m)',
+                      label: '4. Trigger Step 2 Now',
+                      color: AppColors.alarm,
+                      onTap: () => provider.triggerStep2NowForTesting(),
+                    ),
+                    _buildScenarioChip(
+                      label: '5. Arrived (200 m)',
                       color: AppColors.activeTeal,
                       onTap: () => provider.setSimulatedDistance(200.0),
                     ),

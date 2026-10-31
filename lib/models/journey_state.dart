@@ -18,6 +18,9 @@ class JourneyState {
   final AlertStageStatus stage2Status;
   final DateTime? stage1TriggeredAt;
   final DateTime? stage2TriggeredAt;
+  final DateTime? step2ScheduledAt;
+  final int step2DelayMinutes;
+  final int currentAlarmStep;
   final DateTime? startedAt;
   final DateTime? lastPositionUpdate;
   final bool isAlarmSounding;
@@ -40,6 +43,9 @@ class JourneyState {
     this.stage2Status = AlertStageStatus.waiting,
     this.stage1TriggeredAt,
     this.stage2TriggeredAt,
+    this.step2ScheduledAt,
+    this.step2DelayMinutes = 2,
+    this.currentAlarmStep = 0,
     this.startedAt,
     this.lastPositionUpdate,
     this.isAlarmSounding = false,
@@ -66,6 +72,9 @@ class JourneyState {
     AlertStageStatus? stage2Status,
     DateTime? stage1TriggeredAt,
     DateTime? stage2TriggeredAt,
+    DateTime? step2ScheduledAt,
+    int? step2DelayMinutes,
+    int? currentAlarmStep,
     DateTime? startedAt,
     DateTime? lastPositionUpdate,
     bool? isAlarmSounding,
@@ -89,6 +98,9 @@ class JourneyState {
       stage2Status: stage2Status ?? this.stage2Status,
       stage1TriggeredAt: stage1TriggeredAt ?? this.stage1TriggeredAt,
       stage2TriggeredAt: stage2TriggeredAt ?? this.stage2TriggeredAt,
+      step2ScheduledAt: step2ScheduledAt ?? this.step2ScheduledAt,
+      step2DelayMinutes: step2DelayMinutes ?? this.step2DelayMinutes,
+      currentAlarmStep: currentAlarmStep ?? this.currentAlarmStep,
       startedAt: startedAt ?? this.startedAt,
       lastPositionUpdate: lastPositionUpdate ?? this.lastPositionUpdate,
       isAlarmSounding: isAlarmSounding ?? this.isAlarmSounding,
@@ -108,6 +120,9 @@ class JourneyState {
       'stage2Status': stage2Status.index,
       'stage1TriggeredAt': stage1TriggeredAt?.toIso8601String(),
       'stage2TriggeredAt': stage2TriggeredAt?.toIso8601String(),
+      'step2ScheduledAt': step2ScheduledAt?.toIso8601String(),
+      'step2DelayMinutes': step2DelayMinutes,
+      'currentAlarmStep': currentAlarmStep,
       'startedAt': startedAt?.toIso8601String(),
     };
   }
@@ -133,10 +148,14 @@ class JourneyState {
       stage2TriggeredAt: json['stage2TriggeredAt'] != null
           ? DateTime.tryParse(json['stage2TriggeredAt'] as String)
           : null,
+      step2ScheduledAt: json['step2ScheduledAt'] != null
+          ? DateTime.tryParse(json['step2ScheduledAt'] as String)
+          : null,
+      step2DelayMinutes: json['step2DelayMinutes'] as int? ?? 2,
+      currentAlarmStep: json['currentAlarmStep'] as int? ?? 0,
       startedAt: json['startedAt'] != null
           ? DateTime.tryParse(json['startedAt'] as String)
           : null,
     );
   }
 }
-

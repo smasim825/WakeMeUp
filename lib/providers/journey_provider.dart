@@ -18,6 +18,7 @@ class JourneyProvider extends ChangeNotifier {
 
   JourneyState _state = const JourneyState();
   StreamSubscription<Position>? _positionSubscription;
+  Timer? _step2Timer;
   bool _isDisposed = false;
 
   // Simulator distance override (in meters) when simulator is active
@@ -161,6 +162,17 @@ class JourneyProvider extends ChangeNotifier {
       stage2DistanceKm: stage2Km,
     );
     await _storageService.saveAlertDistances(stage1Km: stage1Km, stage2Km: stage2Km);
+    notifyListeners();
+  }
+
+  /// Quick segmented selector: 5 km, 2 km, 1 km, 500 m
+  Future<void> setAlertRadius(double radiusKm) async {
+    final double stage2 = (radiusKm * 0.4).clamp(0.2, 2.0);
+    _state = _state.copyWith(
+      stage1DistanceKm: radiusKm,
+      stage2DistanceKm: stage2,
+    );
+    await _storageService.saveAlertDistances(stage1Km: radiusKm, stage2Km: stage2);
     notifyListeners();
   }
 
@@ -324,18 +336,22 @@ class JourneyProvider extends ChangeNotifier {
   @visibleForTesting
   void processPositionForTesting(Position position) => _processNewPosition(position);
 
-  /// Evaluate Stage 1 (Approaching) and Stage 2 (Wake Up) alert criteria
+  /// Evaluate Stage 1 (Approaching) and Stage 2 (Wake Up 2-Step) alert criteria
   Future<void> _evaluateAlerts(double remainingMeters) async {
     final double stage1Meters = _state.stage1DistanceKm * 1000.0;
     final double stage2Meters = _state.stage2DistanceKm * 1000.0;
     final destName = _state.destination?.name ?? 'Destination';
 
-    // 1. Stage 1 check (Approaching)
+    // 1. Step 1: Perimeter Entry Alert
     if (_state.stage1Status == AlertStageStatus.waiting && remainingMeters <= stage1Meters) {
+      final step2Time = DateTime.now().add(Duration(minutes: _state.step2DelayMinutes));
       _state = _state.copyWith(
         stage1Status: AlertStageStatus.triggered,
         stage1TriggeredAt: DateTime.now(),
-        statusMessage: 'Approaching $destName (${DistanceCalculator.formatDistance(remainingMeters)})',
+        step2ScheduledAt: step2Time,
+        currentAlarmStep: 1,
+        isAlarmSounding: true,
+        statusMessage: 'Approaching $destName! Step 1 Alert sounded. Step 2 follow-up in ${_state.step2DelayMinutes} mins.',
       );
 
       // Trigger notification, sound, vibration
@@ -345,28 +361,57 @@ class JourneyProvider extends ChangeNotifier {
       );
       await _alarmService.triggerApproachingAlert();
       await _storageService.saveActiveJourney(_state);
+
+      // Start Step 2 follow-up timer (2 minutes later)
+      _step2Timer?.cancel();
+      _step2Timer = Timer(Duration(minutes: _state.step2DelayMinutes), () {
+        _triggerStep2Alarm();
+      });
     }
 
-    // 2. Stage 2 check (Wake Up)
-    if (_state.stage2Status == AlertStageStatus.waiting && remainingMeters <= stage2Meters) {
-      _state = _state.copyWith(
-        stage2Status: AlertStageStatus.triggered,
-        stage2TriggeredAt: DateTime.now(),
-        isAlarmSounding: true,
-        statusMessage: 'WAKE UP! Arriving at $destName (${DistanceCalculator.formatDistance(remainingMeters)})',
-      );
+    // 2. Step 2: Wake Up Follow-up Alert (triggers either 2 mins later OR when entering close boundary)
+    final bool isScheduledTimeReached = _state.step2ScheduledAt != null &&
+        DateTime.now().isAfter(_state.step2ScheduledAt!);
+    final bool isCloseBoundaryReached = remainingMeters <= stage2Meters;
 
-      // Trigger critical notification, repeating sound, repeating vibration
-      await _notificationService.showWakeUpNotification(
-        destinationName: destName,
-        distanceKm: _state.stage2DistanceKm,
-      );
-      await _alarmService.triggerWakeUpAlarm();
-      await _storageService.saveActiveJourney(_state);
+    if (_state.stage1Status == AlertStageStatus.triggered &&
+        _state.stage2Status == AlertStageStatus.waiting &&
+        (isScheduledTimeReached || isCloseBoundaryReached)) {
+      await _triggerStep2Alarm();
     }
 
     _updateStatusNotification();
     notifyListeners();
+  }
+
+  /// Trigger Step 2 Follow-up Wake-up Alarm
+  Future<void> _triggerStep2Alarm() async {
+    if (_state.stage2Status != AlertStageStatus.waiting) return;
+    _step2Timer?.cancel();
+    _step2Timer = null;
+
+    final destName = _state.destination?.name ?? 'Destination';
+    _state = _state.copyWith(
+      stage2Status: AlertStageStatus.triggered,
+      stage2TriggeredAt: DateTime.now(),
+      currentAlarmStep: 2,
+      isAlarmSounding: true,
+      statusMessage: '🚨 Step 2 Follow-up Alarm: WAKE UP! Arriving at $destName!',
+    );
+
+    await _notificationService.showWakeUpNotification(
+      destinationName: destName,
+      distanceKm: _state.stage2DistanceKm,
+    );
+    await _alarmService.triggerWakeUpAlarm();
+    await _storageService.saveActiveJourney(_state);
+    _updateStatusNotification();
+    notifyListeners();
+  }
+
+  /// Manually trigger Step 2 in simulator/test mode without waiting 2 minutes
+  Future<void> triggerStep2NowForTesting() async {
+    await _triggerStep2Alarm();
   }
 
   void _updateStatusNotification() {
@@ -393,14 +438,18 @@ class JourneyProvider extends ChangeNotifier {
   Future<void> cancelJourney() async {
     _positionSubscription?.cancel();
     _positionSubscription = null;
+    _step2Timer?.cancel();
+    _step2Timer = null;
     await _alarmService.stopAlarm();
     await _notificationService.cancelAll();
 
     _state = _state.copyWith(
       isActive: false,
       isAlarmSounding: false,
+      currentAlarmStep: 0,
       stage1Status: AlertStageStatus.waiting,
       stage2Status: AlertStageStatus.waiting,
+      step2ScheduledAt: null,
       statusMessage: 'Journey cancelled.',
     );
 
@@ -458,6 +507,8 @@ class JourneyProvider extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _step2Timer?.cancel();
+    _step2Timer = null;
     _positionSubscription?.cancel();
     _alarmService.dispose();
     super.dispose();
