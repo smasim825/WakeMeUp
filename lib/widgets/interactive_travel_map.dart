@@ -23,7 +23,11 @@ class InteractiveTravelMap extends StatefulWidget {
   final ValueChanged<Destination> onDestinationSelected;
   final VoidCallback? onLocateMe;
   final bool isInteractive;
-  final double height;
+  final double? height;
+  final bool isFullScreen;
+  final bool isDarkModeTiles;
+  final bool showInternalControls;
+  final List<Destination>? presetDestinations;
 
   const InteractiveTravelMap({
     super.key,
@@ -36,6 +40,10 @@ class InteractiveTravelMap extends StatefulWidget {
     this.onLocateMe,
     this.isInteractive = true,
     this.height = 280,
+    this.isFullScreen = false,
+    this.isDarkModeTiles = false,
+    this.showInternalControls = true,
+    this.presetDestinations,
   });
 
   @override
@@ -49,6 +57,27 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
 
   void animateTo(LatLng center, {double zoom = 13.0}) {
     _mapController.move(center, zoom);
+  }
+
+  void zoomIn() {
+    _mapController.move(
+      _mapController.camera.center,
+      _mapController.camera.zoom + 1.0,
+    );
+  }
+
+  void zoomOut() {
+    _mapController.move(
+      _mapController.camera.center,
+      _mapController.camera.zoom - 1.0,
+    );
+  }
+
+  void locateMe() {
+    if (widget.currentLocation != null) {
+      _mapController.move(widget.currentLocation!, 13.5);
+    }
+    widget.onLocateMe?.call();
   }
 
   void _onTapMap(TapPosition tapPos, LatLng point) async {
@@ -116,9 +145,9 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
             point: destPoint,
             radius: 5000.0,
             useRadiusInMeter: true,
-            color: AppColors.primaryAccent.withValues(alpha: 0.12),
-            borderColor: AppColors.primaryAccent,
-            borderStrokeWidth: 1.8,
+            color: const Color(0xFF6C5CE7).withValues(alpha: 0.16),
+            borderColor: const Color(0xFF6C5CE7).withValues(alpha: 0.75),
+            borderStrokeWidth: 2.0,
           ),
         );
       }
@@ -130,9 +159,9 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
             point: destPoint,
             radius: 2000.0,
             useRadiusInMeter: true,
-            color: AppColors.alarm.withValues(alpha: 0.12),
-            borderColor: AppColors.alarm.withValues(alpha: 0.8),
-            borderStrokeWidth: 1.8,
+            color: const Color(0xFFFF5252).withValues(alpha: 0.16),
+            borderColor: const Color(0xFFFF5252).withValues(alpha: 0.8),
+            borderStrokeWidth: 2.0,
           ),
         );
       }
@@ -144,29 +173,33 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
             point: destPoint,
             radius: 500.0,
             useRadiusInMeter: true,
-            color: AppColors.warning.withValues(alpha: 0.15),
-            borderColor: AppColors.warning,
-            borderStrokeWidth: 2.0,
+            color: const Color(0xFFFFB454).withValues(alpha: 0.18),
+            borderColor: const Color(0xFFFFB454),
+            borderStrokeWidth: 2.2,
           ),
         );
       }
     }
 
+    final containerDecoration = widget.isFullScreen
+        ? null
+        : BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.borderSubtle, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          );
+
     return Container(
-      height: widget.height,
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderSubtle, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
+      height: widget.isFullScreen ? double.infinity : widget.height,
+      decoration: containerDecoration,
+      clipBehavior: widget.isFullScreen ? Clip.none : Clip.antiAlias,
       child: Stack(
         children: [
           // OpenStreetMap Tile Map
@@ -187,18 +220,19 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.wakeme.app',
                 maxZoom: 19,
-                tileBuilder: (context, tileWidget, tile) {
-                  return ColorFiltered(
-                    colorFilter: const ColorFilter.matrix(<double>[
-                      // Dark navigation theme color inversion
-                      -0.82, 0, 0, 0, 240,
-                      0, -0.82, 0, 0, 240,
-                      0, 0, -0.82, 0, 240,
-                      0, 0, 0, 1, 0,
-                    ]),
-                    child: tileWidget,
-                  );
-                },
+                tileBuilder: widget.isDarkModeTiles
+                    ? (context, tileWidget, tile) {
+                        return ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            -0.82, 0, 0, 0, 240,
+                            0, -0.82, 0, 0, 240,
+                            0, 0, -0.82, 0, 240,
+                            0, 0, 0, 1, 0,
+                          ]),
+                          child: tileWidget,
+                        );
+                      }
+                    : null,
               ),
 
               // Radius Circles
@@ -207,6 +241,66 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
               // Markers Layer
               MarkerLayer(
                 markers: [
+                  // Preset Destination Pins (Black pills matching reference EV UI)
+                  if (widget.presetDestinations != null)
+                    for (final preset in widget.presetDestinations!)
+                      if (widget.selectedDestination == null ||
+                          (widget.selectedDestination!.latitude != preset.latitude &&
+                           widget.selectedDestination!.longitude != preset.longitude))
+                        Marker(
+                          point: LatLng(preset.latitude, preset.longitude),
+                          width: 125,
+                          height: 38,
+                          alignment: Alignment.center,
+                          child: GestureDetector(
+                            onTap: () {
+                              widget.onDestinationSelected(preset);
+                              animateTo(LatLng(preset.latitude, preset.longitude), zoom: 12.5);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F1A2A),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFF283B52), width: 1.1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFF7B61FF),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      preset.name,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
                   // 1. Current User Location: Concentric Cyan/Blue Radar Pulse Marker
                   if (widget.currentLocation != null)
                     Marker(
@@ -275,42 +369,73 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
                       ),
                     ),
 
-                  // 2. Destination Pin Marker
+                  // 2. Destination Pin Marker with Reference-Style Callout Pill
                   if (widget.selectedDestination != null)
                     Marker(
                       point: LatLng(
                         widget.selectedDestination!.latitude,
                         widget.selectedDestination!.longitude,
                       ),
-                      width: 50,
-                      height: 60,
+                      width: 160,
+                      height: 64,
                       alignment: Alignment.topCenter,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(7),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              gradient: AppColors.accentGradient,
-                              shape: BoxShape.circle,
+                              color: const Color(0xFF101B2B),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFF283B52), width: 1.2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryAccent.withValues(alpha: 0.6),
+                                  color: Colors.black.withValues(alpha: 0.45),
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
-                            child: const Icon(
-                              Icons.alarm_on_rounded,
-                              color: AppColors.background,
-                              size: 20,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Color(0xFF00E5A3),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    widget.selectedDestination!.name,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           Container(
-                            width: 3,
-                            height: 10,
-                            color: AppColors.primaryAccent,
+                            width: 2,
+                            height: 6,
+                            color: const Color(0xFF00E5A3),
+                          ),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF00E5A3),
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
                           ),
                         ],
                       ),
@@ -321,82 +446,84 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
           ),
 
           // Top Info Pill
-          Positioned(
-            top: 12,
-            left: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.background.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderSubtle),
+          if (widget.showInternalControls)
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.background.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isReverseGeocoding) ...[
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 1.8, color: AppColors.primaryAccent),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('Locating address...', style: TextStyle(fontSize: 11, color: AppColors.textPrimary)),
+                    ] else ...[
+                      const Icon(Icons.touch_app_rounded, size: 13, color: AppColors.primaryAccent),
+                      const SizedBox(width: 5),
+                      const Text(
+                        'Tap map to set stop',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              child: Row(
+            ),
+
+          // Floating Map Controls (Right Side)
+          if (widget.showInternalControls)
+            Positioned(
+              right: 12,
+              bottom: 30,
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_isReverseGeocoding) ...[
-                    const SizedBox(
-                      width: 10,
-                      height: 10,
-                      child: CircularProgressIndicator(strokeWidth: 1.8, color: AppColors.primaryAccent),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text('Locating address...', style: TextStyle(fontSize: 11, color: AppColors.textPrimary)),
-                  ] else ...[
-                    const Icon(Icons.touch_app_rounded, size: 13, color: AppColors.primaryAccent),
-                    const SizedBox(width: 5),
-                    const Text(
-                      'Tap map to set stop',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    ),
-                  ],
+                  _buildMapButton(
+                    icon: Icons.my_location_rounded,
+                    tooltip: 'My Location',
+                    onTap: () {
+                      if (widget.currentLocation != null) {
+                        _mapController.move(widget.currentLocation!, 13.5);
+                      }
+                      widget.onLocateMe?.call();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildMapButton(
+                    icon: Icons.add_rounded,
+                    tooltip: 'Zoom In',
+                    onTap: () {
+                      _mapController.move(
+                        _mapController.camera.center,
+                        _mapController.camera.zoom + 1.0,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  _buildMapButton(
+                    icon: Icons.remove_rounded,
+                    tooltip: 'Zoom Out',
+                    onTap: () {
+                      _mapController.move(
+                        _mapController.camera.center,
+                        _mapController.camera.zoom - 1.0,
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
-          ),
-
-          // Floating Map Controls (Right Side)
-          Positioned(
-            right: 12,
-            bottom: 30,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildMapButton(
-                  icon: Icons.my_location_rounded,
-                  tooltip: 'My Location',
-                  onTap: () {
-                    if (widget.currentLocation != null) {
-                      _mapController.move(widget.currentLocation!, 13.5);
-                    }
-                    widget.onLocateMe?.call();
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildMapButton(
-                  icon: Icons.add_rounded,
-                  tooltip: 'Zoom In',
-                  onTap: () {
-                    _mapController.move(
-                      _mapController.camera.center,
-                      _mapController.camera.zoom + 1.0,
-                    );
-                  },
-                ),
-                const SizedBox(height: 6),
-                _buildMapButton(
-                  icon: Icons.remove_rounded,
-                  tooltip: 'Zoom Out',
-                  onTap: () {
-                    _mapController.move(
-                      _mapController.camera.center,
-                      _mapController.camera.zoom - 1.0,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
 
           // OpenStreetMap Attribution (Bottom Left)
           Positioned(
