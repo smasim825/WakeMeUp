@@ -77,6 +77,7 @@ class JourneyProvider extends ChangeNotifier {
   /// Request permissions and get current GPS location
   Future<LocationPermissionResult> refreshCurrentLocation() async {
     final result = await _locationService.checkAndRequestPermissions();
+    _state = _state.copyWith(hasLocationPermission: result.isSuccess);
     if (!result.isSuccess) {
       _state = _state.copyWith(statusMessage: result.errorMessage);
       notifyListeners();
@@ -173,6 +174,22 @@ class JourneyProvider extends ChangeNotifier {
       stage2DistanceKm: stage2,
     );
     await _storageService.saveAlertDistances(stage1Km: radiusKm, stage2Km: stage2);
+    notifyListeners();
+  }
+
+  /// Toggle individual alert stages: 5km, 2km, 500m
+  void toggle5kmAlert(bool enable) {
+    _state = _state.copyWith(isStage1Enabled: enable);
+    notifyListeners();
+  }
+
+  void toggle2kmAlert(bool enable) {
+    _state = _state.copyWith(isStage2Enabled: enable);
+    notifyListeners();
+  }
+
+  void toggle500mAlert(bool enable) {
+    _state = _state.copyWith(isStage3Enabled: enable);
     notifyListeners();
   }
 
@@ -378,6 +395,24 @@ class JourneyProvider extends ChangeNotifier {
         _state.stage2Status == AlertStageStatus.waiting &&
         (isScheduledTimeReached || isCloseBoundaryReached)) {
       await _triggerStep2Alarm();
+    }
+
+    // 3. Stage 3 check (500 m – Almost there optional alert)
+    if (_state.isStage3Enabled &&
+        _state.stage3Status == AlertStageStatus.waiting &&
+        remainingMeters <= (_state.stage3DistanceKm * 1000.0)) {
+      _state = _state.copyWith(
+        stage3Status: AlertStageStatus.triggered,
+        stage3TriggeredAt: DateTime.now(),
+        isAlarmSounding: true,
+        statusMessage: '🚨 Almost there! Within 500m of $destName!',
+      );
+      await _notificationService.showWakeUpNotification(
+        destinationName: destName,
+        distanceKm: _state.stage3DistanceKm,
+      );
+      await _alarmService.triggerWakeUpAlarm();
+      await _storageService.saveActiveJourney(_state);
     }
 
     _updateStatusNotification();

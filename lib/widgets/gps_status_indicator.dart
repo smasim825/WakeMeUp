@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 
+/// Header GPS Status Badge showing:
+/// - "GPS Ready" (green/teal dot with pulsing glow)
+/// - "Waiting for GPS" (amber pulsing dot)
+/// - "Location Permission Required" (warning indicator)
 class GpsStatusIndicator extends StatefulWidget {
   final double? accuracyMeters;
   final double? speedKmh;
   final double? latitude;
   final double? longitude;
+  final bool hasPermission;
   final VoidCallback? onRefresh;
 
   const GpsStatusIndicator({
@@ -14,6 +19,7 @@ class GpsStatusIndicator extends StatefulWidget {
     this.speedKmh,
     this.latitude,
     this.longitude,
+    this.hasPermission = true,
     this.onRefresh,
   });
 
@@ -40,99 +46,73 @@ class _GpsStatusIndicatorState extends State<GpsStatusIndicator>
     super.dispose();
   }
 
+  bool get _isPermissionMissing => !widget.hasPermission;
+  bool get _isGpsReady => widget.latitude != null && (widget.accuracyMeters ?? 999.0) <= 60.0;
+
   Color get _statusColor {
-    if (widget.latitude == null) return AppColors.warning;
-    final acc = widget.accuracyMeters ?? 999.0;
-    if (acc <= 30) return AppColors.primaryAccent;
-    if (acc <= 100) return AppColors.warning;
-    return AppColors.alarm;
+    if (_isPermissionMissing) return AppColors.alarm;
+    if (_isGpsReady) return AppColors.primaryAccent;
+    return AppColors.warning;
   }
 
   String get _statusLabel {
-    if (widget.latitude == null) return 'Searching GPS';
-    final acc = widget.accuracyMeters ?? 999.0;
-    if (acc <= 30) return 'GPS Active (±${acc.round()}m)';
-    if (acc <= 100) return 'GPS Moderate (±${acc.round()}m)';
-    return 'GPS Weak (±${acc.round()}m)';
+    if (_isPermissionMissing) return 'Location Permission Required';
+    if (_isGpsReady) return 'GPS Ready';
+    return 'Waiting for GPS';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.secondarySurface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedBuilder(
-            animation: _animController,
-            builder: (context, child) {
-              return Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _statusColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _statusColor.withValues(
-                        alpha: 0.3 + (_animController.value * 0.5),
+    return GestureDetector(
+      onTap: widget.onRefresh,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.secondarySurface.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _statusColor.withValues(alpha: 0.35),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _animController,
+              builder: (context, child) {
+                return Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _statusColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _statusColor.withValues(
+                          alpha: 0.3 + (_animController.value * 0.5),
+                        ),
+                        blurRadius: 6 + (_animController.value * 3),
+                        spreadRadius: _animController.value * 1.5,
                       ),
-                      blurRadius: 6 + (_animController.value * 4),
-                      spreadRadius: _animController.value * 2,
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _statusLabel,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+                    ],
+                  ),
+                );
+              },
             ),
-          ),
-          if (widget.speedKmh != null && widget.speedKmh! > 1) ...[
-            const SizedBox(width: 8),
-            Container(
-              width: 4,
-              height: 4,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 7),
             Text(
-              '${widget.speedKmh!.round()} km/h',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
+              _statusLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: _statusColor,
+                letterSpacing: 0.1,
               ),
             ),
           ],
-          if (widget.onRefresh != null) ...[
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: widget.onRefresh,
-              child: const Icon(
-                Icons.refresh_rounded,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
 }
-

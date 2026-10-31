@@ -107,7 +107,9 @@ class ActiveJourneyScreen extends StatelessWidget {
                   child: InteractiveTravelMap(
                     currentLocation: userLatLng,
                     selectedDestination: destination,
-                    alertDistanceKm: state.stage1DistanceKm,
+                    is5kmActive: state.isStage1Enabled,
+                    is2kmActive: state.isStage2Enabled,
+                    is500mActive: state.isStage3Enabled,
                     isInteractive: true,
                     onDestinationSelected: (_) {}, // read-only during active journey
                     onLocateMe: () => provider.refreshCurrentLocation(),

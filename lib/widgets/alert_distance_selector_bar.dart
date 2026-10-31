@@ -90,3 +90,4 @@ class AlertDistanceSelectorBar extends StatelessWidget {
     );
   }
 }
+

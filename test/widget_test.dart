@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wakeme/models/destination.dart';
 import 'package:wakeme/models/alert_stage.dart';
 import 'package:wakeme/utils/distance_calculator.dart';
+import 'package:wakeme/widgets/alarm_distance_selector.dart';
 
 void main() {
   group('DistanceCalculator Tests', () {
@@ -95,6 +97,55 @@ void main() {
 
       expect(triggered.isTriggered, isTrue);
       expect(triggered.triggeredAt, isNotNull);
+    });
+  });
+
+  group('AlarmDistanceSelector Widget Tests', () {
+    testWidgets('Renders all 3 alarm cards and triggers callbacks', (tester) async {
+      bool is5km = true;
+      bool is2km = true;
+      bool is500m = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return AlarmDistanceSelector(
+                  is5kmEnabled: is5km,
+                  is2kmEnabled: is2km,
+                  is500mEnabled: is500m,
+                  on5kmToggle: (val) => setState(() => is5km = val),
+                  on2kmToggle: (val) => setState(() => is2km = val),
+                  on500mToggle: (val) => setState(() => is500m = val),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // Verify title & headings
+      expect(find.text('When should we wake you?'), findsOneWidget);
+      expect(find.text('5 km'), findsOneWidget);
+      expect(find.text('2 km'), findsOneWidget);
+      expect(find.text('500 m'), findsOneWidget);
+      expect(find.text('Get ready'), findsOneWidget);
+      expect(find.text('Wake me up'), findsOneWidget);
+      expect(find.text('Almost there'), findsOneWidget);
+      expect(find.text('Optional'), findsOneWidget);
+
+      // Tap 500m option to enable it
+      await tester.tap(find.text('500 m'));
+      await tester.pumpAndSettle();
+
+      expect(is500m, isTrue);
+
+      // Tap 5km option to disable it
+      await tester.tap(find.text('5 km'));
+      await tester.pumpAndSettle();
+
+      expect(is5km, isFalse);
     });
   });
 }
