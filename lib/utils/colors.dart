@@ -55,3 +55,4 @@ class AppColors {
   static const Color borderSubtle = Color(0x1FFFFFFF);
   static const Color borderAccent = Color(0x4D40E0C0);
 }
+

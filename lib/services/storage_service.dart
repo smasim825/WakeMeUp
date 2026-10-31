@@ -111,3 +111,4 @@ class StorageService {
     await _prefs.setStringList(_keyRecentDestinations, stringList);
   }
 }
+

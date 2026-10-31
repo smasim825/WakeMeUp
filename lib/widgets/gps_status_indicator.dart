@@ -135,3 +135,4 @@ class _GpsStatusIndicatorState extends State<GpsStatusIndicator>
     );
   }
 }
+

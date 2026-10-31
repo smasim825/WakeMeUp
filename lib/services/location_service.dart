@@ -103,6 +103,7 @@ class LocationService {
         distanceFilter: 10,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
       );
     } else {
       locationSettings = const LocationSettings(

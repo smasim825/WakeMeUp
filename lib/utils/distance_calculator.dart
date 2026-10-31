@@ -74,3 +74,4 @@ class DistanceCalculator {
     return (degrees + 360.0) % 360.0;
   }
 }
+

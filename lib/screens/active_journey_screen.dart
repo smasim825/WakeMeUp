@@ -618,3 +618,4 @@ class ActiveJourneyScreen extends StatelessWidget {
     );
   }
 }
+

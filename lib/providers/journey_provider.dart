@@ -24,7 +24,26 @@ class JourneyProvider extends ChangeNotifier {
   double? _simulatorDistanceMeters;
 
   JourneyProvider(this._storageService) {
-    _initialize();
+    // 1. Synchronously restore persisted state immediately to avoid race conditions or UI flash
+    final savedStage1 = _storageService.getStage1Distance();
+    final savedStage2 = _storageService.getStage2Distance();
+    final savedDest = _storageService.getSavedDestination();
+    final activeJourney = _storageService.getActiveJourney();
+
+    if (activeJourney != null && activeJourney.isActive && activeJourney.destination != null) {
+      _state = activeJourney.copyWith(
+        stage1DistanceKm: savedStage1,
+        stage2DistanceKm: savedStage2,
+      );
+    } else {
+      _state = _state.copyWith(
+        destination: savedDest,
+        stage1DistanceKm: savedStage1,
+        stage2DistanceKm: savedStage2,
+      );
+    }
+
+    _initializeAsync();
   }
 
   @override
@@ -40,36 +59,16 @@ class JourneyProvider extends ChangeNotifier {
   bool get isSimulatorActive => _state.isSimulatorMode;
   double? get simulatorDistanceMeters => _simulatorDistanceMeters;
 
-  Future<void> _initialize() async {
+  Future<void> _initializeAsync() async {
     // 1. Initialize notification service
     await _notificationService.initialize();
 
-    // 2. Load saved alert distances
-    final savedStage1 = _storageService.getStage1Distance();
-    final savedStage2 = _storageService.getStage2Distance();
-
-    // 3. Load saved destination
-    final savedDest = _storageService.getSavedDestination();
-
-    // 4. Check if there was an active journey
-    final activeJourney = _storageService.getActiveJourney();
-
-    if (activeJourney != null && activeJourney.isActive && activeJourney.destination != null) {
-      _state = activeJourney.copyWith(
-        stage1DistanceKm: savedStage1,
-        stage2DistanceKm: savedStage2,
-      );
-      // Resume GPS stream for the restored journey
+    // 2. Resume GPS stream if restored journey is active
+    if (_state.isActive) {
       _startTrackingStream();
-    } else {
-      _state = _state.copyWith(
-        destination: savedDest,
-        stage1DistanceKm: savedStage1,
-        stage2DistanceKm: savedStage2,
-      );
     }
 
-    // 5. Fetch initial current location
+    // 3. Fetch initial current location
     await refreshCurrentLocation();
     notifyListeners();
   }
@@ -253,8 +252,15 @@ class JourneyProvider extends ChangeNotifier {
 
   /// Process incoming GPS position and evaluate alert criteria
   void _processNewPosition(Position position) {
-    // Poor accuracy filtering: ignore readings with accuracy worse than 120m
-    if (position.accuracy > 120.0) {
+    // 1. Stale fix check: ignore cached positions older than 60 seconds
+    final fixAge = DateTime.now().difference(position.timestamp).abs();
+    if (fixAge > const Duration(seconds: 60)) {
+      debugPrint('Skipping stale GPS fix (${fixAge.inSeconds}s old)');
+      return;
+    }
+
+    // 2. Poor accuracy filtering: ignore readings with accuracy worse than 100m
+    if (position.accuracy > 100.0) {
       debugPrint('Skipping inaccurate GPS fix: ${position.accuracy}m');
       _state = _state.copyWith(
         currentAccuracyMeters: position.accuracy,
@@ -279,6 +285,24 @@ class JourneyProvider extends ChangeNotifier {
       _state.destination!.longitude,
     );
 
+    // 3. Started-inside check on initial fix if initialDistanceMeters was not set
+    AlertStageStatus stage1Status = _state.stage1Status;
+    AlertStageStatus stage2Status = _state.stage2Status;
+    String? startNotice = _state.statusMessage;
+
+    if (_state.initialDistanceMeters == null || _state.initialDistanceMeters == 0.0) {
+      final double stage1Meters = _state.stage1DistanceKm * 1000.0;
+      final double stage2Meters = _state.stage2DistanceKm * 1000.0;
+      if (remainingMeters <= stage2Meters && stage2Status == AlertStageStatus.waiting) {
+        stage1Status = AlertStageStatus.startedInside;
+        stage2Status = AlertStageStatus.startedInside;
+        startNotice = 'Started inside ${DistanceCalculator.formatDistance(stage2Meters)} alert radius. Alerts marked as passed.';
+      } else if (remainingMeters <= stage1Meters && stage1Status == AlertStageStatus.waiting) {
+        stage1Status = AlertStageStatus.startedInside;
+        startNotice = 'Started inside ${DistanceCalculator.formatDistance(stage1Meters)} alert radius. Approaching alert marked as passed.';
+      }
+    }
+
     _state = _state.copyWith(
       currentLatitude: position.latitude,
       currentLongitude: position.longitude,
@@ -286,11 +310,19 @@ class JourneyProvider extends ChangeNotifier {
       currentSpeedKmh: position.speed >= 0 ? (position.speed * 3.6) : 0.0,
       currentAccuracyMeters: position.accuracy,
       remainingDistanceMeters: remainingMeters,
+      initialDistanceMeters: _state.initialDistanceMeters ?? remainingMeters,
+      stage1Status: stage1Status,
+      stage2Status: stage2Status,
+      statusMessage: startNotice,
       lastPositionUpdate: DateTime.now(),
     );
 
     _evaluateAlerts(remainingMeters);
   }
+
+  /// Helper exposed for unit and integration testing
+  @visibleForTesting
+  void processPositionForTesting(Position position) => _processNewPosition(position);
 
   /// Evaluate Stage 1 (Approaching) and Stage 2 (Wake Up) alert criteria
   Future<void> _evaluateAlerts(double remainingMeters) async {
