@@ -1,0 +1,433 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import '../models/destination.dart';
+import '../models/alert_stage.dart';
+import '../models/journey_state.dart';
+import '../services/storage_service.dart';
+import '../services/location_service.dart';
+import '../services/notification_service.dart';
+import '../services/alarm_service.dart';
+import '../utils/distance_calculator.dart';
+
+class JourneyProvider extends ChangeNotifier {
+  final StorageService _storageService;
+  final LocationService _locationService = LocationService();
+  final NotificationService _notificationService = NotificationService();
+  final AlarmService _alarmService = AlarmService();
+
+  JourneyState _state = const JourneyState();
+  StreamSubscription<Position>? _positionSubscription;
+  bool _isDisposed = false;
+
+  // Simulator distance override (in meters) when simulator is active
+  double? _simulatorDistanceMeters;
+
+  JourneyProvider(this._storageService) {
+    _initialize();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
+  JourneyState get state => _state;
+  bool get hasDestination => _state.destination != null;
+  bool get isJourneyActive => _state.isActive;
+  bool get isSimulatorActive => _state.isSimulatorMode;
+  double? get simulatorDistanceMeters => _simulatorDistanceMeters;
+
+  Future<void> _initialize() async {
+    // 1. Initialize notification service
+    await _notificationService.initialize();
+
+    // 2. Load saved alert distances
+    final savedStage1 = _storageService.getStage1Distance();
+    final savedStage2 = _storageService.getStage2Distance();
+
+    // 3. Load saved destination
+    final savedDest = _storageService.getSavedDestination();
+
+    // 4. Check if there was an active journey
+    final activeJourney = _storageService.getActiveJourney();
+
+    if (activeJourney != null && activeJourney.isActive && activeJourney.destination != null) {
+      _state = activeJourney.copyWith(
+        stage1DistanceKm: savedStage1,
+        stage2DistanceKm: savedStage2,
+      );
+      // Resume GPS stream for the restored journey
+      _startTrackingStream();
+    } else {
+      _state = _state.copyWith(
+        destination: savedDest,
+        stage1DistanceKm: savedStage1,
+        stage2DistanceKm: savedStage2,
+      );
+    }
+
+    // 5. Fetch initial current location
+    await refreshCurrentLocation();
+    notifyListeners();
+  }
+
+  /// Request permissions and get current GPS location
+  Future<LocationPermissionResult> refreshCurrentLocation() async {
+    final result = await _locationService.checkAndRequestPermissions();
+    if (!result.isSuccess) {
+      _state = _state.copyWith(statusMessage: result.errorMessage);
+      notifyListeners();
+      return result;
+    }
+
+    final pos = await _locationService.getCurrentPosition();
+    if (pos != null) {
+      _updateCurrentPosition(pos);
+    }
+    return result;
+  }
+
+  void _updateCurrentPosition(Position pos) {
+    double? remaining;
+    if (_state.destination != null) {
+      if (_state.isSimulatorMode && _simulatorDistanceMeters != null) {
+        remaining = _simulatorDistanceMeters;
+      } else {
+        remaining = DistanceCalculator.distanceBetween(
+          pos.latitude,
+          pos.longitude,
+          _state.destination!.latitude,
+          _state.destination!.longitude,
+        );
+      }
+    }
+
+    _state = _state.copyWith(
+      currentLatitude: pos.latitude,
+      currentLongitude: pos.longitude,
+      currentAltitude: pos.altitude,
+      currentSpeedKmh: pos.speed >= 0 ? (pos.speed * 3.6) : 0.0,
+      currentAccuracyMeters: pos.accuracy,
+      remainingDistanceMeters: remaining,
+      lastPositionUpdate: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  /// Set selected destination and persist locally for offline usage
+  Future<void> setDestination(Destination destination) async {
+    _state = _state.copyWith(
+      destination: destination,
+      clearDestination: false,
+    );
+
+    await _storageService.saveDestination(destination);
+
+    // Recalculate distance if we have current coordinates
+    if (_state.currentLatitude != null && _state.currentLongitude != null) {
+      final distance = DistanceCalculator.distanceBetween(
+        _state.currentLatitude!,
+        _state.currentLongitude!,
+        destination.latitude,
+        destination.longitude,
+      );
+      _state = _state.copyWith(remainingDistanceMeters: distance);
+    }
+
+    notifyListeners();
+  }
+
+  /// Clear selected destination
+  Future<void> clearDestination() async {
+    if (_state.isActive) {
+      await cancelJourney();
+    }
+    _state = _state.copyWith(
+      clearDestination: true,
+      remainingDistanceMeters: null,
+    );
+    await _storageService.clearSavedDestination();
+    notifyListeners();
+  }
+
+  /// Update customizable alert distance thresholds
+  Future<void> updateAlertDistances({required double stage1Km, required double stage2Km}) async {
+    if (stage2Km >= stage1Km) return; // Stage 2 (wake up) must be closer than Stage 1
+
+    _state = _state.copyWith(
+      stage1DistanceKm: stage1Km,
+      stage2DistanceKm: stage2Km,
+    );
+    await _storageService.saveAlertDistances(stage1Km: stage1Km, stage2Km: stage2Km);
+    notifyListeners();
+  }
+
+  /// Start Journey
+  Future<bool> startJourney() async {
+    if (_state.destination == null) return false;
+
+    // Check location permission
+    final perm = await _locationService.checkAndRequestPermissions();
+    if (!perm.isSuccess) {
+      _state = _state.copyWith(statusMessage: perm.errorMessage);
+      notifyListeners();
+      return false;
+    }
+
+    // Check notification permissions
+    await _notificationService.requestPermissions();
+
+    // Get current position to compute initial distance
+    final currentPos = await _locationService.getCurrentPosition();
+    if (currentPos != null) {
+      _updateCurrentPosition(currentPos);
+    }
+
+    final double currentDistanceMeters = _state.remainingDistanceMeters ??
+        ((_state.currentLatitude != null && _state.currentLongitude != null)
+            ? DistanceCalculator.distanceBetween(
+                _state.currentLatitude!,
+                _state.currentLongitude!,
+                _state.destination!.latitude,
+                _state.destination!.longitude,
+              )
+            : 0.0);
+
+    // Detect if journey started inside an alert radius
+    final double stage1Meters = _state.stage1DistanceKm * 1000.0;
+    final double stage2Meters = _state.stage2DistanceKm * 1000.0;
+
+    AlertStageStatus stage1Status = AlertStageStatus.waiting;
+    AlertStageStatus stage2Status = AlertStageStatus.waiting;
+    String? startNotice;
+
+    if (currentDistanceMeters > 0 && currentDistanceMeters <= stage2Meters) {
+      stage1Status = AlertStageStatus.startedInside;
+      stage2Status = AlertStageStatus.startedInside;
+      startNotice =
+          'You started inside the ${DistanceCalculator.formatDistance(stage2Meters)} radius. Both alerts marked as passed to avoid false alarms.';
+    } else if (currentDistanceMeters > 0 && currentDistanceMeters <= stage1Meters) {
+      stage1Status = AlertStageStatus.startedInside;
+      startNotice =
+          'You started inside the ${DistanceCalculator.formatDistance(stage1Meters)} radius. Approaching alert is marked as passed.';
+    }
+
+    _state = _state.copyWith(
+      isActive: true,
+      initialDistanceMeters: currentDistanceMeters,
+      remainingDistanceMeters: currentDistanceMeters,
+      stage1Status: stage1Status,
+      stage2Status: stage2Status,
+      startedAt: DateTime.now(),
+      statusMessage: startNotice,
+    );
+
+    // Persist active journey state to SharedPreferences
+    await _storageService.saveActiveJourney(_state);
+
+    // Start GPS stream
+    _startTrackingStream();
+
+    // Update status notification
+    _updateStatusNotification();
+
+    notifyListeners();
+    return true;
+  }
+
+  void _startTrackingStream() {
+    _positionSubscription?.cancel();
+    _positionSubscription = _locationService.startPositionStream().listen(
+      (position) {
+        if (!_state.isActive) return;
+        _processNewPosition(position);
+      },
+      onError: (err) {
+        debugPrint('Location stream error: $err');
+      },
+    );
+  }
+
+  /// Process incoming GPS position and evaluate alert criteria
+  void _processNewPosition(Position position) {
+    // Poor accuracy filtering: ignore readings with accuracy worse than 120m
+    if (position.accuracy > 120.0) {
+      debugPrint('Skipping inaccurate GPS fix: ${position.accuracy}m');
+      _state = _state.copyWith(
+        currentAccuracyMeters: position.accuracy,
+        statusMessage: 'GPS signal is weak (accuracy ±${position.accuracy.round()}m). Waiting for accurate fix...',
+      );
+      notifyListeners();
+      return;
+    }
+
+    if (_state.isSimulatorMode && _simulatorDistanceMeters != null) {
+      // In simulator mode, use simulated distance
+      _evaluateAlerts(_simulatorDistanceMeters!);
+      return;
+    }
+
+    if (_state.destination == null) return;
+
+    final remainingMeters = DistanceCalculator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      _state.destination!.latitude,
+      _state.destination!.longitude,
+    );
+
+    _state = _state.copyWith(
+      currentLatitude: position.latitude,
+      currentLongitude: position.longitude,
+      currentAltitude: position.altitude,
+      currentSpeedKmh: position.speed >= 0 ? (position.speed * 3.6) : 0.0,
+      currentAccuracyMeters: position.accuracy,
+      remainingDistanceMeters: remainingMeters,
+      lastPositionUpdate: DateTime.now(),
+    );
+
+    _evaluateAlerts(remainingMeters);
+  }
+
+  /// Evaluate Stage 1 (Approaching) and Stage 2 (Wake Up) alert criteria
+  Future<void> _evaluateAlerts(double remainingMeters) async {
+    final double stage1Meters = _state.stage1DistanceKm * 1000.0;
+    final double stage2Meters = _state.stage2DistanceKm * 1000.0;
+    final destName = _state.destination?.name ?? 'Destination';
+
+    // 1. Stage 1 check (Approaching)
+    if (_state.stage1Status == AlertStageStatus.waiting && remainingMeters <= stage1Meters) {
+      _state = _state.copyWith(
+        stage1Status: AlertStageStatus.triggered,
+        stage1TriggeredAt: DateTime.now(),
+        statusMessage: 'Approaching $destName (${DistanceCalculator.formatDistance(remainingMeters)})',
+      );
+
+      // Trigger notification, sound, vibration
+      await _notificationService.showApproachingNotification(
+        destinationName: destName,
+        distanceKm: _state.stage1DistanceKm,
+      );
+      await _alarmService.triggerApproachingAlert();
+      await _storageService.saveActiveJourney(_state);
+    }
+
+    // 2. Stage 2 check (Wake Up)
+    if (_state.stage2Status == AlertStageStatus.waiting && remainingMeters <= stage2Meters) {
+      _state = _state.copyWith(
+        stage2Status: AlertStageStatus.triggered,
+        stage2TriggeredAt: DateTime.now(),
+        isAlarmSounding: true,
+        statusMessage: 'WAKE UP! Arriving at $destName (${DistanceCalculator.formatDistance(remainingMeters)})',
+      );
+
+      // Trigger critical notification, repeating sound, repeating vibration
+      await _notificationService.showWakeUpNotification(
+        destinationName: destName,
+        distanceKm: _state.stage2DistanceKm,
+      );
+      await _alarmService.triggerWakeUpAlarm();
+      await _storageService.saveActiveJourney(_state);
+    }
+
+    _updateStatusNotification();
+    notifyListeners();
+  }
+
+  void _updateStatusNotification() {
+    if (!_state.isActive || _state.destination == null) return;
+    final remaining = _state.remainingDistanceMeters ?? 0.0;
+    final initial = _state.initialDistanceMeters ?? remaining;
+    final progress = DistanceCalculator.calculateProgress(initial, remaining);
+
+    _notificationService.showJourneyStatusNotification(
+      destinationName: _state.destination!.name,
+      formattedDistance: DistanceCalculator.formatDistance(remaining),
+      progressPercent: progress,
+    );
+  }
+
+  /// Dismiss sounding alarm (sound + vibration) while maintaining journey
+  Future<void> dismissAlarm() async {
+    await _alarmService.stopAlarm();
+    _state = _state.copyWith(isAlarmSounding: false);
+    notifyListeners();
+  }
+
+  /// Cancel active journey
+  Future<void> cancelJourney() async {
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+    await _alarmService.stopAlarm();
+    await _notificationService.cancelAll();
+
+    _state = _state.copyWith(
+      isActive: false,
+      isAlarmSounding: false,
+      stage1Status: AlertStageStatus.waiting,
+      stage2Status: AlertStageStatus.waiting,
+      statusMessage: 'Journey cancelled.',
+    );
+
+    await _storageService.clearActiveJourney();
+    notifyListeners();
+  }
+
+  // ==========================================
+  // Developer Distance Simulator
+  // ==========================================
+
+  void toggleSimulatorMode(bool enable) {
+    _state = _state.copyWith(isSimulatorMode: enable);
+    if (!enable) {
+      _simulatorDistanceMeters = null;
+    } else {
+      _simulatorDistanceMeters ??= _state.remainingDistanceMeters ?? 8000.0;
+    }
+    notifyListeners();
+  }
+
+  /// Inject simulated distance in meters to test alert triggers cleanly
+  Future<void> setSimulatedDistance(double distanceMeters) async {
+    if (!_state.isSimulatorMode) return;
+    _simulatorDistanceMeters = distanceMeters;
+    _state = _state.copyWith(
+      remainingDistanceMeters: distanceMeters,
+      lastPositionUpdate: DateTime.now(),
+      statusMessage: '[Simulator] Distance set to ${DistanceCalculator.formatDistance(distanceMeters)}',
+    );
+    await _evaluateAlerts(distanceMeters);
+    notifyListeners();
+  }
+
+  /// Step simulator distance closer by a set amount
+  Future<void> stepSimulatorCloser(double stepMeters) async {
+    if (!_state.isSimulatorMode) return;
+    final current = _simulatorDistanceMeters ?? _state.remainingDistanceMeters ?? 6000.0;
+    final next = (current - stepMeters).clamp(0.0, 50000.0);
+    await setSimulatedDistance(next);
+  }
+
+  /// Reset alert triggers in simulator mode for quick repeated testing
+  void resetAlertTriggersForTesting() {
+    _alarmService.stopAlarm();
+    _state = _state.copyWith(
+      stage1Status: AlertStageStatus.waiting,
+      stage2Status: AlertStageStatus.waiting,
+      isAlarmSounding: false,
+      statusMessage: '[Simulator] Alert stages reset for testing.',
+    );
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _positionSubscription?.cancel();
+    _alarmService.dispose();
+    super.dispose();
+  }
+}

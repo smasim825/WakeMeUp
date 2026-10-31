@@ -7,7 +7,18 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Wakeme</string>
+	<string>WakeMe</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WakeMe requires your location to calculate distance to your arrival destination and trigger your wake-up alarm.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WakeMe requires continuous location updates while your journey is active so you are alerted when you approach your destination, even when the screen is locked or the app is in the background.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>WakeMe tracks your distance to destination during your active journey to alert you before you arrive.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
