@@ -137,6 +137,9 @@ class JourneyProvider extends ChangeNotifier {
 
   /// Set selected destination and persist locally for offline usage
   Future<void> setDestination(Destination destination) async {
+    // Changing the destination mid-journey would silently retarget the alarms.
+    if (_state.isActive) return;
+
     _state = _state.copyWith(
       destination: destination,
       clearRemainingDistance: true,

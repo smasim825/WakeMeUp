@@ -365,6 +365,26 @@ void main() {
       final d = DistanceCalculator.distanceBetween(0, 0, 0, 180);
       expect(d.isNaN, isFalse);
     });
+
+    test('Cannot retarget destination mid-journey when isActive is true', () async {
+      await journeyProvider.setDestination(dest);
+      // Simulate active state persisted in storage
+      await storageService.saveActiveJourney(journeyProvider.state.copyWith(isActive: true));
+      journeyProvider = JourneyProvider(storageService);
+      expect(journeyProvider.state.isActive, isTrue);
+
+      const anotherDest = Destination(
+        name: 'Another City',
+        address: 'Far Away',
+        latitude: 10.0,
+        longitude: 20.0,
+      );
+      await journeyProvider.setDestination(anotherDest);
+      // Destination must still remain the original one
+      expect(journeyProvider.state.destination?.name, equals('Regression Stop'));
+
+      await journeyProvider.cancelJourney();
+    });
   });
 
   group('Journey State Persistence Tests', () {

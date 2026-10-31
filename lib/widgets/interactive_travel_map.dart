@@ -45,6 +45,7 @@ class InteractiveTravelMap extends StatefulWidget {
 class InteractiveTravelMapState extends State<InteractiveTravelMap> {
   final MapController _mapController = MapController();
   bool _isReverseGeocoding = false;
+  int _tapCounter = 0; // guards against out-of-order reverse-geocode replies
 
   void animateTo(LatLng center, {double zoom = 13.0}) {
     _mapController.move(center, zoom);
@@ -52,6 +53,7 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
 
   void _onTapMap(TapPosition tapPos, LatLng point) async {
     if (!widget.isInteractive) return;
+    final int tapId = ++_tapCounter;
 
     setState(() {
       _isReverseGeocoding = true;
@@ -71,7 +73,7 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
         point.latitude,
         point.longitude,
       );
-      if (mounted) {
+      if (mounted && tapId == _tapCounter) {
         final parts = resolved.split(',');
         final mainTitle = parts.first.trim();
         final secondary = parts.skip(1).take(2).join(',').trim();
@@ -87,7 +89,7 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
       }
     } catch (_) {}
 
-    if (mounted) {
+    if (mounted && tapId == _tapCounter) {
       setState(() {
         _isReverseGeocoding = false;
       });
@@ -365,7 +367,7 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Text(
-                '© OpenStreetMap contributors',
+                '© OpenStreetMap contributors © CARTO',
                 style: TextStyle(
                   fontSize: 9,
                   color: Colors.white70,
