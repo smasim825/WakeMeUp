@@ -130,25 +130,34 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(7),
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                gradient: AppColors.accentGradient,
-                borderRadius: BorderRadius.circular(10),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF00E5A3),
+                    Color(0xFF00BFA5),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryAccent.withValues(alpha: 0.35),
-                    blurRadius: 8,
+                    color: const Color(0xFF00E5A3).withValues(alpha: 0.45),
+                    blurRadius: 16,
+                    spreadRadius: 1,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: const Icon(
-                Icons.alarm_on_rounded,
-                color: AppColors.background,
-                size: 20,
+                Icons.alarm_rounded,
+                color: Color(0xFF09111D),
+                size: 24,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -164,9 +173,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'GPS Destination Alarm',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                    color: Color(0xFF8E9EB5),
                   ),
                 ),
               ],
@@ -185,15 +194,25 @@ class _HomeScreenState extends State<HomeScreen> {
               hasPermission: state.hasLocationPermission,
               onRefresh: () => provider.refreshCurrentLocation(),
             ),
-            const SizedBox(width: 6),
-            IconButton(
-              icon: Icon(
-                Icons.bug_report_rounded,
-                size: 20,
-                color: state.isSimulatorMode ? AppColors.warning : AppColors.textSecondary,
+            const SizedBox(width: 8),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF122033),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF1E334D), width: 1),
               ),
-              tooltip: 'GPS Test Simulator',
-              onPressed: () => DevSimulatorDialog.show(context),
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  Icons.tune_rounded,
+                  size: 19,
+                  color: state.isSimulatorMode ? AppColors.warning : const Color(0xFF8E9EB5),
+                ),
+                tooltip: 'GPS Test Simulator',
+                onPressed: () => DevSimulatorDialog.show(context),
+              ),
             ),
           ],
         ),
@@ -221,8 +240,23 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    return GlassCard(
+    return Container(
       padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101B2B),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFF1A2B40),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -230,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text(
             'Where are you heading?',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 18.5,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
               letterSpacing: -0.4,
@@ -242,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: Color(0xFF8E9EB5),
             ),
           ),
           const SizedBox(height: 14),
@@ -262,21 +296,29 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               decoration: BoxDecoration(
-                color: AppColors.secondarySurface.withValues(alpha: 0.6),
+                color: const Color(0xFF152438),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: destination != null ? AppColors.primaryAccent : AppColors.borderSubtle,
+                  color: destination != null ? const Color(0xFF00E5A3) : const Color(0xFF1F354E),
                   width: destination != null ? 1.4 : 1.0,
                 ),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.location_on_rounded,
-                    color: AppColors.primaryAccent,
-                    size: 20,
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF00E5A3).withValues(alpha: 0.16),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_rounded,
+                      color: Color(0xFF00E5A3),
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -289,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: destination != null ? FontWeight.w700 : FontWeight.w400,
                         color: destination != null
                             ? AppColors.textPrimary
-                            : AppColors.textSecondary,
+                            : const Color(0xFF6E849C),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -300,13 +342,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () => provider.clearDestination(),
                       child: const Icon(
                         Icons.close_rounded,
-                        color: AppColors.textSecondary,
+                        color: Color(0xFF8E9EB5),
                         size: 18,
                       ),
                     ),
                     const SizedBox(width: 6),
                   ],
-                  // Current location button
+                  // Current location crosshair button
                   GestureDetector(
                     onTap: () {
                       provider.refreshCurrentLocation();
@@ -321,15 +363,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(5),
+                      padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryAccent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        color: const Color(0xFF00E5A3).withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
-                        Icons.my_location_rounded,
+                        Icons.gps_fixed_rounded,
                         size: 16,
-                        color: AppColors.primaryAccent,
+                        color: Color(0xFF00E5A3),
                       ),
                     ),
                   ),
@@ -359,14 +401,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? AppColors.primaryAccent.withValues(alpha: 0.2)
-                            : AppColors.secondarySurface.withValues(alpha: 0.5),
+                            ? const Color(0xFF00E5A3).withValues(alpha: 0.18)
+                            : const Color(0xFF142133),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? AppColors.primaryAccent : AppColors.borderSubtle,
+                          color: isSelected ? const Color(0xFF00E5A3) : const Color(0xFF1F3248),
                           width: 1,
                         ),
                       ),
@@ -376,15 +418,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(
                             Icons.place_outlined,
                             size: 13,
-                            color: isSelected ? AppColors.primaryAccent : AppColors.textSecondary,
+                            color: isSelected ? const Color(0xFF00E5A3) : const Color(0xFF7A8FA6),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 5),
                           Text(
                             dest.name,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? AppColors.primaryAccent : AppColors.textSecondary,
+                              color: isSelected ? const Color(0xFF00E5A3) : const Color(0xFF8E9EB5),
                             ),
                           ),
                         ],
@@ -414,30 +456,37 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.map_rounded, size: 16, color: AppColors.primaryAccent),
-                SizedBox(width: 6),
+                Icon(Icons.map_rounded, size: 16, color: Color(0xFF00E5A3)),
+                SizedBox(width: 7),
                 Text(
                   'Map Preview',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
             if (destination != null)
-              Text(
-                'Destination set',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryAccent,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5A3).withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Destination set',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF00E5A3),
+                  ),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         // Interactive Map inside large rounded card
         InteractiveTravelMap(
@@ -447,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
           is5kmActive: provider.state.isStage1Enabled,
           is2kmActive: provider.state.isStage2Enabled,
           is500mActive: provider.state.isStage3Enabled,
-          height: 290,
+          height: 310,
           onDestinationSelected: (newDest) {
             provider.setDestination(newDest);
           },
@@ -466,17 +515,31 @@ class _HomeScreenState extends State<HomeScreen> {
     final hasDest = destination != null;
     final isActive = provider.state.isActive;
 
-    return SizedBox(
+    return Container(
       width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: hasDest
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF00E5A3).withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: isActive ? AppColors.activeTeal : AppColors.primaryAccent,
-          foregroundColor: AppColors.background,
+          backgroundColor: isActive ? AppColors.activeTeal : const Color(0xFF00E5A3),
+          foregroundColor: const Color(0xFF08101C),
+          disabledBackgroundColor: const Color(0xFF142133),
+          disabledForegroundColor: const Color(0xFF4C5E72),
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-          elevation: hasDest ? 6 : 0,
+          elevation: 0,
         ),
         onPressed: !hasDest
             ? null
@@ -512,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> {
               isActive ? 'VIEW ACTIVE JOURNEY' : 'Start My Journey',
               style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 letterSpacing: 0.3,
               ),
             ),

@@ -80,7 +80,8 @@ class AlarmDistanceSelector extends StatelessWidget {
                 distance: '5 km',
                 subtitle: 'Get ready',
                 isActive: is5kmEnabled,
-                accentColor: AppColors.primaryAccent,
+                accentColor: const Color(0xFF00E5A3),
+                activeBgColor: const Color(0xFF0E2927),
                 icon: Icons.notifications_active_rounded,
                 isOptional: false,
                 onTap: () {
@@ -96,7 +97,8 @@ class AlarmDistanceSelector extends StatelessWidget {
                 distance: '2 km',
                 subtitle: 'Wake me up',
                 isActive: is2kmEnabled,
-                accentColor: AppColors.alarm,
+                accentColor: const Color(0xFFFF5353),
+                activeBgColor: const Color(0xFF2C161C),
                 icon: Icons.alarm_on_rounded,
                 isOptional: false,
                 onTap: () {
@@ -112,7 +114,8 @@ class AlarmDistanceSelector extends StatelessWidget {
                 distance: '500 m',
                 subtitle: 'Almost there',
                 isActive: is500mEnabled,
-                accentColor: AppColors.warning,
+                accentColor: const Color(0xFFFFB454),
+                activeBgColor: const Color(0xFF261D15),
                 icon: Icons.near_me_rounded,
                 isOptional: true,
                 onTap: () {
@@ -131,6 +134,7 @@ class AlarmDistanceSelector extends StatelessWidget {
     required String subtitle,
     required bool isActive,
     required Color accentColor,
+    required Color activeBgColor,
     required IconData icon,
     required bool isOptional,
     required VoidCallback onTap,
@@ -138,23 +142,21 @@ class AlarmDistanceSelector extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 220),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          color: isActive
-              ? accentColor.withValues(alpha: 0.14)
-              : AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(16),
+          color: isActive ? activeBgColor : const Color(0xFF121F31),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isActive ? accentColor : AppColors.borderSubtle,
-            width: isActive ? 1.6 : 1.0,
+            color: isActive ? accentColor : const Color(0xFF1B2D43),
+            width: isActive ? 1.5 : 1.0,
           ),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: accentColor.withValues(alpha: 0.25),
-                    blurRadius: 10,
+                    color: accentColor.withValues(alpha: 0.22),
+                    blurRadius: 12,
                     offset: const Offset(0, 3),
                   ),
                 ]
@@ -168,37 +170,37 @@ class AlarmDistanceSelector extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  size: 18,
-                  color: isActive ? accentColor : AppColors.textSecondary,
+                  size: 20,
+                  color: isActive ? accentColor : const Color(0xFF7A8FA6),
                 ),
                 Container(
-                  width: 16,
-                  height: 16,
+                  width: 18,
+                  height: 18,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isActive ? accentColor : Colors.transparent,
                     border: Border.all(
-                      color: isActive ? accentColor : AppColors.textSecondary.withValues(alpha: 0.5),
+                      color: isActive ? accentColor : const Color(0xFF3E546E),
                       width: 1.5,
                     ),
                   ),
                   child: isActive
                       ? const Icon(
-                          Icons.check,
-                          size: 11,
-                          color: AppColors.background,
+                          Icons.check_rounded,
+                          size: 13,
+                          color: Color(0xFF09111D),
                         )
                       : null,
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               distance,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.w900,
-                color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                color: isActive ? AppColors.textPrimary : const Color(0xFF9BB0C7),
                 letterSpacing: -0.3,
               ),
             ),
@@ -207,26 +209,26 @@ class AlarmDistanceSelector extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isActive ? accentColor : AppColors.textSecondary.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+                color: isActive ? accentColor : const Color(0xFF6C829B),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             if (isOptional) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.secondarySurface,
-                  borderRadius: BorderRadius.circular(4),
+                  color: const Color(0xFF18283C),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
                   'Optional',
                   style: TextStyle(
-                    fontSize: 9,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 9.5,
+                    color: Color(0xFF7B90A7),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),

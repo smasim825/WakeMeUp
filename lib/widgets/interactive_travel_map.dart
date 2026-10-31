@@ -207,38 +207,70 @@ class InteractiveTravelMapState extends State<InteractiveTravelMap> {
               // Markers Layer
               MarkerLayer(
                 markers: [
-                  // 1. Current User Location: Distinct Blue Marker
+                  // 1. Current User Location: Concentric Cyan/Blue Radar Pulse Marker
                   if (widget.currentLocation != null)
                     Marker(
                       point: widget.currentLocation!,
-                      width: 40,
-                      height: 40,
+                      width: 72,
+                      height: 72,
                       child: Center(
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF2196F3).withValues(alpha: 0.35),
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 14,
-                              height: 14,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Outer pulse ring
+                            Container(
+                              width: 68,
+                              height: 68,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: const Color(0xFF2196F3), // Distinct blue
+                                color: const Color(0xFF00E5A3).withValues(alpha: 0.08),
+                                border: Border.all(
+                                  color: const Color(0xFF00E5A3).withValues(alpha: 0.28),
+                                  width: 1.2,
+                                ),
+                              ),
+                            ),
+                            // Middle pulse ring
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF00E5A3).withValues(alpha: 0.16),
+                                border: Border.all(
+                                  color: const Color(0xFF00E5A3).withValues(alpha: 0.55),
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            // Inner core circle
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF0091EA),
                                 border: Border.all(color: Colors.white, width: 2.5),
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Color(0xFF1E88E5),
-                                    blurRadius: 8,
+                                    color: const Color(0xFF00E5A3).withValues(alpha: 0.6),
+                                    blurRadius: 10,
                                     spreadRadius: 2,
                                   ),
                                 ],
                               ),
+                              child: Center(
+                                child: Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ),

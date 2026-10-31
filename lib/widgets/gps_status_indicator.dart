@@ -66,14 +66,20 @@ class _GpsStatusIndicatorState extends State<GpsStatusIndicator>
     return GestureDetector(
       onTap: widget.onRefresh,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.secondarySurface.withValues(alpha: 0.65),
-          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFF101E2E),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _statusColor.withValues(alpha: 0.35),
             width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: _statusColor.withValues(alpha: 0.08),
+              blurRadius: 8,
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -90,9 +96,9 @@ class _GpsStatusIndicatorState extends State<GpsStatusIndicator>
                     boxShadow: [
                       BoxShadow(
                         color: _statusColor.withValues(
-                          alpha: 0.3 + (_animController.value * 0.5),
+                          alpha: 0.4 + (_animController.value * 0.5),
                         ),
-                        blurRadius: 6 + (_animController.value * 3),
+                        blurRadius: 6 + (_animController.value * 4),
                         spreadRadius: _animController.value * 1.5,
                       ),
                     ],
@@ -104,10 +110,10 @@ class _GpsStatusIndicatorState extends State<GpsStatusIndicator>
             Text(
               _statusLabel,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 color: _statusColor,
-                letterSpacing: 0.1,
+                letterSpacing: 0.2,
               ),
             ),
           ],
