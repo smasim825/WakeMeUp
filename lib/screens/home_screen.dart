@@ -22,7 +22,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<InteractiveTravelMapState> _mapKey = GlobalKey<InteractiveTravelMapState>();
 
-  // Preset popular travel destinations (shown as chips & pins on map)
+  // Preset popular travel destinations (shown as pins on map)
   static const List<Destination> _presetDestinations = [
     Destination(
       name: 'Kamalapur, Dhaka',
@@ -86,22 +86,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // 2. TOP OVERLAY: Dark Header, Title, Floating Search Bar & Horizontal Chips
+              // 2. UNIFIED FLOATING SEARCH & CONTROLS HEADER (Single clean bar like Google Maps)
               Positioned(
                 top: 0,
-                left: 0,
-                right: 0,
-                child: _buildTopHeaderSection(context, provider, destination),
+                left: 14,
+                right: 14,
+                child: SafeArea(
+                  child: _buildUnifiedFloatingHeader(context, provider, destination),
+                ),
               ),
 
-              // 3. FLOATING MAP CONTROLS (Right side, stacked above bottom drawer)
+              // 3. FLOATING LOCATE ME BUTTON (Bottom-right, right above bottom sheet)
               Positioned(
                 right: 16,
-                bottom: destination != null ? 245 : 100,
-                child: _buildFloatingMapControls(provider, userLatLng),
+                bottom: destination != null ? 310 : 90,
+                child: _buildLocateMeButton(provider),
               ),
 
-              // 4. BOTTOM DRAWER / CONTROL SHEET (Full-screen clean layout, no bottom tabs)
+              // 4. BOTTOM DRAWER / CONTROL SHEET
               Positioned(
                 left: 0,
                 right: 0,
@@ -119,10 +121,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // =========================================================================
-  // TOP OVERLAY: Map Title, Search Bar & Reference-Style Chips
+  // UNIFIED FLOATING TOP BAR (Minimal, clean, single floating capsule)
   // =========================================================================
 
-  Widget _buildTopHeaderSection(
+  Widget _buildUnifiedFloatingHeader(
     BuildContext context,
     JourneyProvider provider,
     Destination? destination,
@@ -130,402 +132,161 @@ class _HomeScreenState extends State<HomeScreen> {
     final state = provider.state;
 
     return Container(
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF0C1728).withValues(alpha: 0.98),
-            const Color(0xFF0C1728).withValues(alpha: 0.92),
-            const Color(0xFF0C1728).withValues(alpha: 0.0),
-          ],
-          stops: const [0.0, 0.78, 1.0],
+        color: const Color(0xFF0F1B2D).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: destination != null ? const Color(0xFF7B61FF) : const Color(0xFF223652),
+          width: 1.2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Top Bar: Centered "Map" title with GPS status and Simulator icons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // App Icon & Name
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E5A3),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF00E5A3).withValues(alpha: 0.4),
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.alarm_rounded,
-                          color: Color(0xFF09111D),
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Map',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ),
+      child: Row(
+        children: [
+          // App Logo / Green Accent
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFF00E5A3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.alarm_rounded,
+              color: Color(0xFF09111D),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
 
-                  // GPS Status & Alarm Sound & Simulator triggers
-                  Row(
-                    children: [
-                      GpsStatusIndicator(
-                        accuracyMeters: state.currentAccuracyMeters,
-                        speedKmh: state.currentSpeedKmh,
-                        latitude: state.currentLatitude,
-                        longitude: state.currentLongitude,
-                        hasPermission: state.hasLocationPermission,
-                        onRefresh: () => provider.refreshCurrentLocation(),
-                      ),
-                      const SizedBox(width: 8),
-                      // Alarm Audio Test Button
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF132236),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1E3550)),
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.notifications_active_outlined,
-                            size: 17,
-                            color: Color(0xFF00E5A3),
-                          ),
-                          tooltip: 'Alarm Audio Test',
-                          onPressed: () => _showAlarmsBottomSheet(context, provider),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF132236),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1E3550)),
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: Icon(
-                            Icons.tune_rounded,
-                            size: 17,
-                            color: state.isSimulatorMode ? AppColors.warning : const Color(0xFF8E9EB5),
-                          ),
-                          tooltip: 'GPS Simulator',
-                          onPressed: () => DevSimulatorDialog.show(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Floating Search Bar: "Where are you going?"
-              GestureDetector(
-                onTap: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SearchDestinationScreen()),
+          // Search Field Text (Tappable)
+          Expanded(
+            child: InkWell(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SearchDestinationScreen()),
+                );
+                final updated = provider.state.destination;
+                if (updated != null) {
+                  _mapKey.currentState?.animateTo(
+                    LatLng(updated.latitude, updated.longitude),
+                    zoom: 12.5,
                   );
-                  final updated = provider.state.destination;
-                  if (updated != null) {
-                    _mapKey.currentState?.animateTo(
-                      LatLng(updated.latitude, updated.longitude),
-                      zoom: 12.5,
-                    );
-                  }
-                },
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF132236),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: destination != null ? const Color(0xFF7B61FF) : const Color(0xFF223652),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        color: Color(0xFF8E9EB5),
-                        size: 21,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          destination != null ? destination.name : 'Where are you going?',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: destination != null ? FontWeight.w700 : FontWeight.w400,
-                            color: destination != null ? Colors.white : const Color(0xFF7A8FA6),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (destination != null)
-                        GestureDetector(
-                          onTap: () => provider.clearDestination(),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF203248),
-                            ),
-                            child: const Icon(
-                              Icons.close_rounded,
-                              color: Colors.white70,
-                              size: 15,
-                            ),
-                          ),
-                        )
-                      else
-                        const Icon(
-                          Icons.tune_rounded,
-                          color: Color(0xFF7A8FA6),
-                          size: 19,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Horizontal Scrolling Chips: Alert stages & quick cities (Purple/Indigo style like reference image)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 5 km Alert Toggle Chip
-                    _buildFilterChip(
-                      label: '5 km Alert',
-                      isActive: state.isStage1Enabled,
-                      activeColor: const Color(0xFF6C5CE7),
-                      icon: Icons.notifications_none_rounded,
-                      onTap: () => provider.toggle5kmAlert(!state.isStage1Enabled),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // 2 km Alert Toggle Chip
-                    _buildFilterChip(
-                      label: '2 km Alert',
-                      isActive: state.isStage2Enabled,
-                      activeColor: const Color(0xFF7B61FF),
-                      icon: Icons.alarm_rounded,
-                      onTap: () => provider.toggle2kmAlert(!state.isStage2Enabled),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // 500 m Alert Toggle Chip
-                    _buildFilterChip(
-                      label: '500 m Alert',
-                      isActive: state.isStage3Enabled,
-                      activeColor: const Color(0xFFFFB454),
-                      icon: Icons.near_me_outlined,
-                      onTap: () => provider.toggle500mAlert(!state.isStage3Enabled),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Preset City Stops
-                    for (final preset in _presetDestinations) ...[
-                      _buildFilterChip(
-                        label: preset.name.split(',').first,
-                        isActive: destination != null &&
-                            destination.name.toLowerCase().contains(preset.name.toLowerCase().split(',').first),
-                        activeColor: const Color(0xFF00E5A3),
-                        icon: Icons.place_outlined,
-                        onTap: () {
-                          provider.setDestination(preset);
-                          _mapKey.currentState?.animateTo(
-                            LatLng(preset.latitude, preset.longitude),
-                            zoom: 12.5,
-                          );
-                        },
+                    Text(
+                      destination != null ? destination.name : 'Where are you going?',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: destination != null ? FontWeight.w800 : FontWeight.w500,
+                        color: destination != null ? Colors.white : const Color(0xFF8E9EB5),
                       ),
-                      const SizedBox(width: 8),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (destination == null)
+                      const Text(
+                        'Search station, city or tap map',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF5E738C),
+                        ),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildFilterChip({
-    required String label,
-    required bool isActive,
-    required Color activeColor,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? activeColor : const Color(0xFF132236),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isActive ? activeColor : const Color(0xFF223652),
-            width: 1.1,
+          // If destination set, show clear 'X' button
+          if (destination != null)
+            IconButton(
+              icon: const Icon(Icons.close_rounded, color: Color(0xFF8E9EB5), size: 19),
+              tooltip: 'Clear Destination',
+              onPressed: () => provider.clearDestination(),
+            ),
+
+          // GPS Status Pill / Live Dot
+          GpsStatusIndicator(
+            accuracyMeters: state.currentAccuracyMeters,
+            speedKmh: state.currentSpeedKmh,
+            latitude: state.currentLatitude,
+            longitude: state.currentLongitude,
+            hasPermission: state.hasLocationPermission,
+            onRefresh: () => provider.refreshCurrentLocation(),
           ),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: activeColor.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isActive ? Colors.white : const Color(0xFF8E9EB5),
+          const SizedBox(width: 4),
+
+          // Quick Alarm Audio Test
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: const Icon(
+              Icons.notifications_active_outlined,
+              size: 19,
+              color: Color(0xFF00E5A3),
             ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? Colors.white : const Color(0xFFB0C0D4),
-              ),
+            tooltip: 'Alarm Sound Test',
+            onPressed: () => _showAlarmsBottomSheet(context, provider),
+          ),
+
+          // GPS Simulator (for dev test)
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            icon: Icon(
+              Icons.tune_rounded,
+              size: 18,
+              color: state.isSimulatorMode ? AppColors.warning : const Color(0xFF6E849C),
             ),
-          ],
-        ),
+            tooltip: 'GPS Test Simulator',
+            onPressed: () => DevSimulatorDialog.show(context),
+          ),
+        ],
       ),
     );
   }
 
   // =========================================================================
-  // FLOATING MAP CONTROLS (Right side stack)
+  // FLOATING LOCATE ME BUTTON
   // =========================================================================
 
-  Widget _buildFloatingMapControls(JourneyProvider provider, LatLng? userLatLng) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Layers / Quick Focus Button
-        _buildSquareIconButton(
-          icon: Icons.layers_outlined,
-          tooltip: 'Preset Stations',
-          onTap: () {
-            final dest = provider.state.destination;
-            if (dest != null) {
-              _mapKey.currentState?.animateTo(LatLng(dest.latitude, dest.longitude), zoom: 13.0);
-            } else {
-              _mapKey.currentState?.animateTo(
-                const LatLng(23.7314, 90.4266), // Dhaka Center
-                zoom: 11.5,
-              );
-            }
-          },
-        ),
-        const SizedBox(height: 8),
-
-        // Zoom In Button
-        _buildSquareIconButton(
-          icon: Icons.add_rounded,
-          tooltip: 'Zoom In',
-          onTap: () => _mapKey.currentState?.zoomIn(),
-        ),
-        const SizedBox(height: 6),
-
-        // Zoom Out Button
-        _buildSquareIconButton(
-          icon: Icons.remove_rounded,
-          tooltip: 'Zoom Out',
-          onTap: () => _mapKey.currentState?.zoomOut(),
-        ),
-        const SizedBox(height: 8),
-
-        // Locate Me Button (Navigation Arrow like reference screenshot)
-        _buildSquareIconButton(
-          icon: Icons.navigation_rounded,
-          tooltip: 'Locate Me',
-          isAccent: true,
-          onTap: () {
-            provider.refreshCurrentLocation();
-            _mapKey.currentState?.locateMe();
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSquareIconButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-    bool isAccent = false,
-  }) {
+  Widget _buildLocateMeButton(JourneyProvider provider) {
     return Material(
-      color: isAccent ? const Color(0xFF6C5CE7) : const Color(0xFF0F1B2D).withValues(alpha: 0.94),
+      color: const Color(0xFF0F1B2D).withValues(alpha: 0.94),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isAccent ? const Color(0xFF8B7CF8) : const Color(0xFF223652),
-          width: 1.1,
-        ),
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFF223652), width: 1.2),
       ),
       elevation: 6,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          provider.refreshCurrentLocation();
+          _mapKey.currentState?.locateMe();
+        },
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          width: 42,
-          height: 42,
+          width: 46,
+          height: 46,
           alignment: Alignment.center,
-          child: Icon(
-            icon,
-            color: isAccent ? Colors.white : const Color(0xFFD4E2F4),
-            size: 20,
+          child: const Icon(
+            Icons.my_location_rounded,
+            color: Color(0xFF00E5A3),
+            size: 22,
           ),
         ),
       ),
@@ -561,73 +322,69 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00E5A3).withValues(alpha: 0.16),
-                    shape: BoxShape.circle,
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00E5A3).withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.directions_transit_rounded,
+                color: Color(0xFF00E5A3),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'JOURNEY ACTIVE',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF00E5A3),
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.directions_transit_rounded,
-                    color: Color(0xFF00E5A3),
-                    size: 20,
+                  Text(
+                    '${DistanceCalculator.formatDistance(remaining)} to ${destination?.name ?? 'stop'}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'TRACKING ACTIVE',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF00E5A3),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        '${DistanceCalculator.formatDistance(remaining)} to ${destination?.name ?? 'destination'}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E5A3),
-                    foregroundColor: const Color(0xFF08101C),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ActiveJourneyScreen()),
-                    );
-                  },
-                  child: const Text('Live View', style: TextStyle(fontWeight: FontWeight.w800)),
-                ),
-              ],
+                ],
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00E5A3),
+                foregroundColor: const Color(0xFF08101C),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ActiveJourneyScreen()),
+                );
+              },
+              child: const Text('Live View', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ],
         ),
       );
     }
 
-    // B. Destination Selected Sheet
+    // B. Destination Selected Sheet (Clean & Compact)
     if (destination != null) {
       double? distMeters;
       if (state.currentLatitude != null && state.currentLongitude != null) {
@@ -641,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xFF0F1B2D),
           borderRadius: BorderRadius.circular(22),
@@ -658,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stop Header: Name & distance away
+            // Stop Header: Name & distance badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -669,19 +426,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         destination.name,
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 16.5,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         destination.address.isNotEmpty
                             ? destination.address
                             : 'GPS: ${destination.latitude.toStringAsFixed(4)}, ${destination.longitude.toStringAsFixed(4)}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF8E9EB5)),
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF8E9EB5)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -690,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (distMeters != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFF6C5CE7).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
@@ -699,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(
                       DistanceCalculator.formatDistance(distMeters),
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF8B7CF8),
                       ),
@@ -707,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             // Alarm Stage Selector (5km, 2km, 500m)
             AlarmDistanceSelector(
@@ -719,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
               on500mToggle: (val) => provider.toggle500mAlert(val),
               isEnabled: true,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Start Journey Button
             _buildStartButton(context, provider, destination),
@@ -728,74 +485,51 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // C. No Destination Selected Prompt Card
+    // C. No Destination Selected: Minimal Floating Prompt
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF0F1B2D).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF223652), width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFF7B61FF).withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.touch_app_rounded,
-              color: Color(0xFF8B7CF8),
-              size: 20,
-            ),
+          const Icon(
+            Icons.touch_app_rounded,
+            color: Color(0xFF00E5A3),
+            size: 20,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Set Alarm Stop',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  'Tap anywhere on map or choose a city above',
-                  style: TextStyle(fontSize: 11.5, color: Color(0xFF8E9EB5)),
-                ),
-              ],
+            child: Text(
+              'Tap anywhere on the map to set a stop',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
             ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6C5CE7),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF00E5A3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             ),
-            onPressed: () {
-              final defaultCity = _presetDestinations.first;
-              provider.setDestination(defaultCity);
-              _mapKey.currentState?.animateTo(
-                LatLng(defaultCity.latitude, defaultCity.longitude),
-                zoom: 12.5,
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SearchDestinationScreen()),
               );
             },
-            child: const Text('Quick Stop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            child: const Text('Search', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         ],
       ),
@@ -814,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF00E5A3).withValues(alpha: 0.35),
-            blurRadius: 16,
+            blurRadius: 14,
             offset: const Offset(0, 3),
           ),
         ],
@@ -823,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF00E5A3),
           foregroundColor: const Color(0xFF08101C),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
@@ -851,13 +585,13 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               'Start My Journey',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15.5,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.3,
               ),
             ),
             SizedBox(width: 8),
-            Icon(Icons.navigation_rounded, size: 20),
+            Icon(Icons.navigation_rounded, size: 19),
           ],
         ),
       ),
@@ -879,15 +613,15 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Alarm Ringtone & Audio Status',
+                'Alarm Ringtone & Audio Test',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               const Text(
-                'WakeMe plays an audio alarm loop and vibrates when you cross your set alert radius.',
+                'WakeMe sounds a continuous audio alarm and vibrates when your train or bus crosses your alarm perimeter.',
                 style: TextStyle(fontSize: 13, color: Color(0xFF8E9EB5)),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6C5CE7),
@@ -896,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: const Icon(Icons.volume_up_rounded),
-                label: const Text('Test Alarm Audio & Vibration'),
+                label: const Text('Test Alarm Sound & Vibration'),
                 onPressed: () {
                   Navigator.pop(ctx);
                   DevSimulatorDialog.show(context);
