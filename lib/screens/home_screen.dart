@@ -21,7 +21,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<InteractiveTravelMapState> _mapKey = GlobalKey<InteractiveTravelMapState>();
-  int _selectedNavTab = 0;
 
   // Preset popular travel destinations (shown as chips & pins on map)
   static const List<Destination> _presetDestinations = [
@@ -98,24 +97,18 @@ class _HomeScreenState extends State<HomeScreen> {
               // 3. FLOATING MAP CONTROLS (Right side, stacked above bottom drawer)
               Positioned(
                 right: 16,
-                bottom: destination != null ? 310 : 160,
+                bottom: destination != null ? 245 : 100,
                 child: _buildFloatingMapControls(provider, userLatLng),
               ),
 
-              // 4. BOTTOM DRAWER / CONTROL SHEET & NAVIGATION BAR
+              // 4. BOTTOM DRAWER / CONTROL SHEET (Full-screen clean layout, no bottom tabs)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Active journey or destination selection sheet
-                    _buildBottomControlSheet(context, provider, destination),
-
-                    // Sleek Dark Bottom Navigation Bar
-                    _buildBottomNavigationBar(context, provider),
-                  ],
+                child: SafeArea(
+                  top: false,
+                  child: _buildBottomControlSheet(context, provider, destination),
                 ),
               ),
             ],
@@ -195,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  // GPS Status & Simulator trigger
+                  // GPS Status & Alarm Sound & Simulator triggers
                   Row(
                     children: [
                       GpsStatusIndicator(
@@ -205,6 +198,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         longitude: state.currentLongitude,
                         hasPermission: state.hasLocationPermission,
                         onRefresh: () => provider.refreshCurrentLocation(),
+                      ),
+                      const SizedBox(width: 8),
+                      // Alarm Audio Test Button
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF132236),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF1E3550)),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.notifications_active_outlined,
+                            size: 17,
+                            color: Color(0xFF00E5A3),
+                          ),
+                          tooltip: 'Alarm Audio Test',
+                          onPressed: () => _showAlarmsBottomSheet(context, provider),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -844,107 +858,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(width: 8),
             Icon(Icons.navigation_rounded, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // =========================================================================
-  // BOTTOM NAVIGATION BAR (Exact replica of reference UI tabs)
-  // =========================================================================
-
-  Widget _buildBottomNavigationBar(BuildContext context, JourneyProvider provider) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF091220),
-        border: Border(
-          top: BorderSide(color: Color(0xFF16253C), width: 1.0),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                label: 'Dashboard',
-                icon: Icons.grid_view_rounded,
-                onTap: () {
-                  setState(() => _selectedNavTab = 0);
-                },
-              ),
-              _buildNavItem(
-                index: 1,
-                label: 'Saved',
-                icon: Icons.bookmark_border_rounded,
-                onTap: () {
-                  setState(() => _selectedNavTab = 1);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SearchDestinationScreen()),
-                  );
-                },
-              ),
-              _buildNavItem(
-                index: 2,
-                label: 'Alarms',
-                icon: Icons.notifications_active_outlined,
-                onTap: () {
-                  setState(() => _selectedNavTab = 2);
-                  _showAlarmsBottomSheet(context, provider);
-                },
-              ),
-              _buildNavItem(
-                index: 3,
-                label: 'Simulator',
-                icon: Icons.tune_rounded,
-                onTap: () {
-                  setState(() => _selectedNavTab = 3);
-                  DevSimulatorDialog.show(context);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    final isSelected = _selectedNavTab == index;
-    final activeColor = const Color(0xFF00E5A3);
-    final inactiveColor = const Color(0xFF7A8FA6);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? activeColor : inactiveColor,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? activeColor : inactiveColor,
-              ),
-            ),
           ],
         ),
       ),

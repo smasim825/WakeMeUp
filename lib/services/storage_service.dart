@@ -11,6 +11,7 @@ class StorageService {
   static const String _keyStage2Distance = 'wakeme_stage2_distance_km';
   static const String _keyActiveJourney = 'wakeme_active_journey';
   static const String _keyRecentDestinations = 'wakeme_recent_destinations';
+  static const String _keyFavoriteDestinations = 'wakeme_favorite_destinations';
 
   final SharedPreferences _prefs;
 
@@ -109,6 +110,43 @@ class StorageService {
     final trimmed = existing.take(10).toList();
     final stringList = trimmed.map((d) => jsonEncode(d.toJson())).toList();
     await _prefs.setStringList(_keyRecentDestinations, stringList);
+  }
+
+  // --- Favorite / Bookmarked Destinations (100% offline, stored locally in phone SharedPreferences) ---
+
+  List<Destination> getFavoriteDestinations() {
+    final list = _prefs.getStringList(_keyFavoriteDestinations) ?? [];
+    return list.map((item) {
+      try {
+        return Destination.fromJson(jsonDecode(item) as Map<String, dynamic>);
+      } catch (_) {
+        return null;
+      }
+    }).whereType<Destination>().toList();
+  }
+
+  Future<bool> toggleFavoriteDestination(Destination dest) async {
+    final list = getFavoriteDestinations();
+    final index = list.indexWhere((d) =>
+        d.name.toLowerCase() == dest.name.toLowerCase() ||
+        (d.latitude == dest.latitude && d.longitude == dest.longitude));
+
+    if (index >= 0) {
+      list.removeAt(index);
+    } else {
+      list.insert(0, dest);
+    }
+
+    final stringList = list.map((d) => jsonEncode(d.toJson())).toList();
+    await _prefs.setStringList(_keyFavoriteDestinations, stringList);
+    return index < 0; // true if added, false if removed
+  }
+
+  bool isFavorite(Destination dest) {
+    final list = getFavoriteDestinations();
+    return list.any((d) =>
+        d.name.toLowerCase() == dest.name.toLowerCase() ||
+        (d.latitude == dest.latitude && d.longitude == dest.longitude));
   }
 }
 

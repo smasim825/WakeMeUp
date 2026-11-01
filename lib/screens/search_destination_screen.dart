@@ -23,6 +23,7 @@ class _SearchDestinationScreenState extends State<SearchDestinationScreen> {
   String? _errorMessage;
   List<Destination> _searchResults = [];
   List<Destination> _recentDestinations = [];
+  List<Destination> _favoriteDestinations = [];
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _SearchDestinationScreenState extends State<SearchDestinationScreen> {
     final storage = context.read<StorageService>();
     setState(() {
       _recentDestinations = storage.getRecentDestinations();
+      _favoriteDestinations = storage.getFavoriteDestinations();
     });
   }
 
@@ -180,7 +182,7 @@ class _SearchDestinationScreenState extends State<SearchDestinationScreen> {
   }
 
   Widget _buildRecentsList() {
-    if (_recentDestinations.isEmpty) {
+    if (_recentDestinations.isEmpty && _favoriteDestinations.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -215,27 +217,63 @@ class _SearchDestinationScreenState extends State<SearchDestinationScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            'Recent Destinations (Available Offline)',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.5,
+        if (_favoriteDestinations.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 10),
+            child: Row(
+              children: [
+                Icon(Icons.star_rounded, size: 16, color: Colors.amber),
+                SizedBox(width: 6),
+                Text(
+                  'Saved Favorites (Offline)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        ..._recentDestinations.map((dest) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildDestinationTile(dest, isRecent: true),
-            )),
+          ..._favoriteDestinations.map((dest) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildDestinationTile(dest, isRecent: false, isFavorite: true),
+              )),
+          const SizedBox(height: 14),
+        ],
+        if (_recentDestinations.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 10),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, size: 16, color: AppColors.textSecondary),
+                SizedBox(width: 6),
+                Text(
+                  'Recent Destinations (Offline)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ..._recentDestinations.map((dest) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildDestinationTile(dest, isRecent: true),
+              )),
+        ],
       ],
     );
   }
 
-  Widget _buildDestinationTile(Destination dest, {required bool isRecent}) {
+  Widget _buildDestinationTile(Destination dest, {required bool isRecent, bool isFavorite = false}) {
+    final storage = context.read<StorageService>();
+    final isFav = isFavorite || storage.isFavorite(dest);
+
     return GlassCard(
       padding: const EdgeInsets.all(16),
       onTap: () => _selectDestination(dest),
@@ -244,15 +282,21 @@ class _SearchDestinationScreenState extends State<SearchDestinationScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isRecent
-                  ? AppColors.secondarySurface
-                  : AppColors.primaryAccent.withValues(alpha: 0.15),
+              color: isFav
+                  ? Colors.amber.withValues(alpha: 0.16)
+                  : (isRecent
+                      ? AppColors.secondarySurface
+                      : AppColors.primaryAccent.withValues(alpha: 0.15)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isRecent ? Icons.history_rounded : Icons.location_on_rounded,
-              color: isRecent ? AppColors.textSecondary : AppColors.primaryAccent,
-              size: 22,
+              isFav
+                  ? Icons.star_rounded
+                  : (isRecent ? Icons.history_rounded : Icons.place_rounded),
+              color: isFav
+                  ? Colors.amber
+                  : (isRecent ? AppColors.textSecondary : AppColors.primaryAccent),
+              size: 20,
             ),
           ),
           const SizedBox(width: 14),
@@ -270,33 +314,30 @@ class _SearchDestinationScreenState extends State<SearchDestinationScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (dest.address.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    dest.address,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
                 const SizedBox(height: 4),
                 Text(
-                  '${dest.latitude.toStringAsFixed(4)}, ${dest.longitude.toStringAsFixed(4)}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    color: AppColors.primaryAccent.withValues(alpha: 0.8),
+                  dest.address,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textSecondary,
+          IconButton(
+            icon: Icon(
+              isFav ? Icons.star_rounded : Icons.star_border_rounded,
+              color: isFav ? Colors.amber : const Color(0xFF5A708A),
+              size: 20,
+            ),
+            tooltip: isFav ? 'Remove Favorite' : 'Save as Favorite',
+            onPressed: () async {
+              await storage.toggleFavoriteDestination(dest);
+              _loadRecents();
+            },
           ),
         ],
       ),
